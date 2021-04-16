@@ -1,55 +1,10 @@
 use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable};
 use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::system::{Vector2i, Vector2f};
-use std::convert::{AsRef, TryInto};
+use std::convert::{TryInto};
 
-#[derive(Clone)]
-pub struct Particle {
-    p_type: ParticleType,
-    velocity: Vector2i
-}
-
-#[derive(Clone)]
-pub enum ParticleType {
-    Sand,
-    Wood,
-    Empty
-}
-
-pub struct Grid {
-    pub width: u32,
-    pub height: u32,
-    pub grid: Vec<Particle>
-}
-
-pub trait GridExt {
-    fn new(width: u32, height: u32) -> Grid;
-    fn get(&self, x: u32, y: u32) -> &Particle;
-    fn set(&mut self, x: u32, y: u32, p: &Particle);
-}
-
-impl GridExt for Grid {
-    fn new(width: u32, height: u32) -> Grid {
-        let empty = Particle {
-            p_type: ParticleType::Empty,
-            velocity: Vector2i::new(0, 0)
-        };
-
-        Grid {
-            width: width,
-            height: height,
-            grid: vec![empty; (width * height).try_into().unwrap()]
-        }
-    }
-
-    fn get(&self, x: u32, y: u32) -> &Particle {
-        &self.grid[(x + y * self.width) as usize]
-    }
-
-    fn set(&mut self, x: u32, y: u32, p: &Particle) {
-        self.grid[(x + y * self.width) as usize] = p.clone();
-    }
-}
+mod grid;
+use grid::*;
 
 pub struct RenderContext {
     pub scale: f32
@@ -61,6 +16,13 @@ fn create_simple_grid() -> Grid {
     for x in 0..grid.width {
         grid.set(x, grid.height - 1, & Particle {
             p_type: ParticleType::Wood,
+            velocity: Vector2i::new(0, 0)
+        });
+    }
+
+    for y in 10..(grid.height - 10) {
+        grid.set(grid.width / 2, y, & Particle {
+            p_type: ParticleType::Sand,
             velocity: Vector2i::new(0, 0)
         });
     }
