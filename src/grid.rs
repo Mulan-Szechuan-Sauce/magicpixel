@@ -1,5 +1,6 @@
 use sfml::system::{Vector2i};
 use std::convert::{TryInto};
+use std::marker::{Sized};
 
 #[derive(Clone)]
 pub struct Particle {
@@ -10,6 +11,7 @@ pub struct Particle {
 #[derive(Clone, PartialEq)]
 pub enum ParticleType {
     Sand,
+    Water,
     Wood,
     Empty
 }
@@ -30,6 +32,7 @@ pub trait GridExt {
     fn set_velocity(&mut self, x: i32, y: i32, velocity: Vector2i);
     fn reset_velocity(&mut self, x: i32, y: i32);
     fn is_empty(&mut self, x: i32, y: i32) -> bool;
+    fn translate(&mut self, x1: i32, y1: i32, x2: i32, y2: i32);
 }
 
 impl GridExt for Grid {
@@ -67,7 +70,20 @@ impl GridExt for Grid {
     }
 
     fn is_empty(&mut self, x: i32, y: i32) -> bool {
-        x < 0 || x >= self.width || y < 0 || y >= self.height ||
+        if x < 0 || x >= self.width || y < 0 || y >= self.height {
+            false
+        } else {
             self.get(x, y).p_type == ParticleType::Empty
+        }
+    }
+
+    fn translate(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
+        if x2 >= 0 && x2 < self.width && y2 >= 0 && y2 < self.height {
+            let p1 = self.get(x1, y1);
+            self.grid[(x2 + y2 * self.width) as usize] = p1.clone();
+        }
+
+        self.set_type(x1, y1, ParticleType::Empty);
+        self.reset_velocity(x1, y1);
     }
 }
