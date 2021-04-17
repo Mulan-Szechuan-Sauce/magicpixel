@@ -1,6 +1,6 @@
 use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable};
 use sfml::window::{VideoMode, Event, Style, Key};
-use sfml::system::{Vector2i, Vector2f};
+use sfml::system::{Vector2i, Vector2f, Clock};
 use std::convert::{TryInto};
 
 mod grid;
@@ -8,6 +8,41 @@ use grid::*;
 
 pub struct RenderContext {
     pub scale: f32
+}
+
+fn move_sand(grid: &mut Grid, x: i32, y: i32) {
+    if grid.is_empty(x, y + 1) {
+        let p = grid.get(x, y).clone();
+        grid.set(x, y + 1, &p);
+
+        grid.set_type(x, y, ParticleType::Empty);
+        grid.reset_velocity(x, y);
+    } else if grid.is_empty(x - 1, y + 1) {
+        let p = grid.get(x, y).clone();
+        grid.set(x - 1, y + 1, &p);
+
+        grid.set_type(x, y, ParticleType::Empty);
+        grid.reset_velocity(x, y);
+    } else if grid.is_empty(x + 1, y + 1) {
+        let p = grid.get(x, y).clone();
+        grid.set(x + 1, y + 1, &p);
+
+        grid.set_type(x, y, ParticleType::Empty);
+        grid.reset_velocity(x, y);
+    }
+}
+
+fn isaac_newton(grid: &mut Grid) {
+    for y in (0..grid.height).rev() {
+        for x in 0..grid.width {
+            let particle = grid.get(x, y);
+
+            match particle.p_type {
+                ParticleType::Sand => move_sand(grid, x, y),
+                _ => {}
+            }
+        }
+    }
 }
 
 fn create_simple_grid() -> Grid {
@@ -30,7 +65,7 @@ fn create_simple_grid() -> Grid {
     grid
 }
 
-fn render_grid(window: &RenderWindow, context: &RenderContext, grid: &Grid) {
+fn render_grid(window: &RenderWindow, context: &RenderContext, grid: &mut Grid) {
     let scale = context.scale;
 
     for x in 0..grid.width {
@@ -55,7 +90,7 @@ fn render_grid(window: &RenderWindow, context: &RenderContext, grid: &Grid) {
 }
 
 fn main() {
-    let grid = create_simple_grid();
+    let mut grid = create_simple_grid();
 
     let desktop = VideoMode::desktop_mode();
 
@@ -77,6 +112,11 @@ fn main() {
         ((desktop.height - win_height) / 2).try_into().unwrap()
     ));
 
+    let clock = Clock::start();
+    let mut prev_tick = 0;
+    let tick_time = 0.1;
+    let mut is_paused = false;
+
     while window.is_open() {
         // Event processing
         while let Some(event) = window.poll_event() {
@@ -85,6 +125,8 @@ fn main() {
                 Event::Closed |
                 Event::KeyPressed { code: Key::ESCAPE, .. } =>
                     window.close(),
+                Event::KeyPressed { code: Key::P, .. } =>
+                    is_paused = !is_paused,
                 _ => { /* Do nothing */ }
             }
         }
@@ -93,9 +135,22 @@ fn main() {
         window.set_active(true);
 
         window.clear(Color::BLACK);
-        // OpenGL drawing commands go here...
 
-        render_grid(&window, &context, &grid);
+        // FIXME: Run on a UI thread instead
+
+        let curr_time = clock.elapsed_time().as_seconds();
+        let curr_tick = (curr_time / tick_time) as u32;
+
+        if curr_tick > prev_tick {
+            while prev_tick < curr_tick {
+                if ! is_paused {
+                    isaac_newton(&mut grid);
+                }
+                prev_tick += 1;
+            }
+        }
+
+        render_grid(&window, &context, &mut grid);
 
         // End the current frame and display its contents on screen
         window.display();
