@@ -1,13 +1,18 @@
-use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable};
+use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Text, Font};
 use sfml::window::{VideoMode, Event, Style, Key};
-use sfml::system::{Vector2i, Vector2f, Clock};
+use sfml::window::mouse::{Button};
+use sfml::system::{Vector2i, Vector2f, Clock, SfStr, SfStrConv};
 use std::convert::{TryInto};
+use core::ops::Deref;
 
 mod grid;
 use grid::*;
 
 pub struct RenderContext {
-    pub scale: f32
+    pub scale: f32,
+    pub water_rect: RectangleShape<'static>,
+    pub sand_rect: RectangleShape<'static>,
+    pub wood_rect: RectangleShape<'static>
 }
 
 fn move_sand(grid: &mut Grid, x: i32, y: i32) {
@@ -47,12 +52,14 @@ fn move_water(grid: &mut Grid, x: i32, y: i32) -> Option<TranslateOp> {
     if grid.is_empty(x, y + 1) {
         Some(TranslateOp::new(x, y, x, y + 1))
     } else if grid.is_empty(x - 1, y + 1) {
+        grid.get(x, y).velocity = Vector2i::new(-1, 0);
         Some(TranslateOp::new(x, y, x - 1, y + 1))
     } else if grid.is_empty(x + 1, y + 1) {
+        grid.get(x, y).velocity = Vector2i::new(1, 0);
         Some(TranslateOp::new(x, y, x + 1, y + 1))
-    } else if grid.is_empty(x + 1, y) {
+    } else if grid.is_empty(x + 1, y) && grid.get(x, y).velocity.x > 0 {
         Some(TranslateOp::new(x, y, x + 1, y))
-    } else if grid.is_empty(x - 1, y) {
+    } else if grid.is_empty(x - 1, y) && grid.get(x, y).velocity.x < 0 {
         Some(TranslateOp::new(x, y, x - 1, y))
     } else {
         None
@@ -88,7 +95,7 @@ fn isaac_newton(grid: &mut Grid) {
 }
 
 fn create_simple_grid() -> Grid {
-    let mut grid = Grid::new(200, 100);
+    let mut grid = Grid::new(800, 400);
 
     for y in 10..(grid.height - 10) {
         grid.set(grid.width / 2, y, & Particle {
@@ -109,30 +116,52 @@ fn create_simple_grid() -> Grid {
     grid
 }
 
-fn render_grid(window: &RenderWindow, context: &RenderContext, grid: &mut Grid) {
-    let scale = context.scale;
+fn render_particle(window: &RenderWindow, scale: f32, rect: &mut RectangleShape, x: i32, y: i32) {
+    rect.set_position(Vector2f::new(x as f32 * scale, y as f32 * scale));
+    window.draw_rectangle_shape(&rect, &RenderStates::default());
+}
 
+fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &mut Grid) {
     for x in 0..grid.width {
         for y in 0..grid.height {
             let p = grid.get(x, y);
 
-            let mut rect = RectangleShape::with_size(Vector2f::new(scale, scale));
-            rect.set_position(Vector2f::new(x as f32 * scale, y as f32 * scale));
-
             match p.p_type {
-                ParticleType::Empty =>
-                    rect.set_fill_color(Color::BLACK),
-                ParticleType::Wood =>
-                    rect.set_fill_color(Color::rgb(139, 69, 19)),
-                ParticleType::Water =>
-                    rect.set_fill_color(Color::BLUE),
-                ParticleType::Sand =>
-                    rect.set_fill_color(Color::rgb(194, 178, 128)),
+                ParticleType::Empty => {}
+                ParticleType::Wood => {
+                    render_particle(window, context.scale, &mut context.wood_rect, x, y);
+                },
+                ParticleType::Water => {
+                    render_particle(window, context.scale, &mut context.water_rect, x, y);
+                },
+                ParticleType::Sand => {
+                    render_particle(window, context.scale, &mut context.sand_rect, x, y);
+                }
             }
-
-            window.draw_rectangle_shape(&rect, &RenderStates::default());
         }
     }
+}
+
+fn insert_particle(
+    grid: &mut Grid,
+    context: &RenderContext,
+    mouse_x: i32,
+    mouse_y: i32,
+    p_type: &ParticleType
+) {
+    let x = (mouse_x as f32 / context.scale) as i32;
+    let y = (mouse_y as f32 / context.scale) as i32;
+
+    grid.set(x, y, & Particle {
+        p_type: p_type.clone(),
+        velocity: Vector2i::new(0, 0)
+    });
+}
+ 
+fn new_particle_shape(color: Color, scale: f32) -> RectangleShape<'static> {
+    let mut rect = RectangleShape::with_size(Vector2f::new(scale, scale));
+    rect.set_fill_color(color);
+    rect
 }
 
 fn main() {
@@ -140,8 +169,13 @@ fn main() {
 
     let desktop = VideoMode::desktop_mode();
 
-    let context = RenderContext {
-        scale: 12.0
+    let scale = 2.0;
+
+    let mut context = RenderContext {
+        scale: scale,
+        wood_rect: new_particle_shape(Color::rgb(139, 69, 19), scale),
+        water_rect: new_particle_shape(Color::BLUE, scale),
+        sand_rect: new_particle_shape(Color::rgb(194, 178, 128), scale)
     };
 
     let win_width = (grid.width as f32 * context.scale).ceil() as u32;
@@ -151,7 +185,10 @@ fn main() {
         VideoMode::new(win_width, win_height, desktop.bits_per_pixel),
         "Ok zoomer",
         Style::CLOSE,
-        &Default::default());
+        &Default::default()
+    );
+
+    //window.set_framerate_limit(60);
 
     window.set_position(Vector2i::new(
         ((desktop.width - win_width) / 2).try_into().unwrap(),
@@ -162,6 +199,20 @@ fn main() {
     let mut prev_tick = 0;
     let tick_time = 0.05;
     let mut is_paused = false;
+    let mut is_depressed = false;
+    let mut draw_p_type = ParticleType::Water;
+    let mut mouse_x = 0;
+    let mut mouse_y = 0;
+
+    let mut last_frame_time = 0.0;
+
+    let font = Font::from_file("assets/Jura-Medium.ttf").unwrap();
+
+    let mut text = Text::default();
+    text.set_font(font.deref());
+    text.set_position(Vector2f::new(0.0, 0.0));
+    text.set_character_size(24);
+    text.set_fill_color(Color::WHITE);
 
     while window.is_open() {
         // Event processing
@@ -173,6 +224,26 @@ fn main() {
                     window.close(),
                 Event::KeyPressed { code: Key::P, .. } =>
                     is_paused = !is_paused,
+                Event::MouseWheelScrolled { delta, .. } => {
+                    // TODO: Make this less waste once we have more particles
+                    if draw_p_type == ParticleType::Water {
+                        draw_p_type = ParticleType::Sand;
+                    } else {
+                        draw_p_type = ParticleType::Water;
+                    }
+                },
+                Event::MouseButtonPressed { button: Button::LEFT, x, y } => {
+                    is_depressed = true;
+                    mouse_x = x;
+                    mouse_y = y;
+                },
+                Event::MouseButtonReleased { button: Button::LEFT, x, y } => {
+                    is_depressed = false;
+                },
+                Event::MouseMoved { x, y } => {
+                    mouse_x = x;
+                    mouse_y = y;
+                }
                 _ => { /* Do nothing */ }
             }
         }
@@ -183,6 +254,10 @@ fn main() {
         window.clear(Color::BLACK);
 
         // FIXME: Run on a UI thread instead
+
+        if is_depressed {
+            insert_particle(&mut grid, &context, mouse_x, mouse_y, &draw_p_type);
+        }
 
         let curr_time = clock.elapsed_time().as_seconds();
         let curr_tick = (curr_time / tick_time) as u32;
@@ -196,7 +271,16 @@ fn main() {
             }
         }
 
-        render_grid(&window, &context, &mut grid);
+        render_grid(&window, &mut context, &mut grid);
+
+        // Render the FPS
+
+        let fps = 1.0 / (curr_time - last_frame_time as f32);
+
+        text.set_string(&format!("{:.0}", fps));
+        window.draw(&text);
+
+        last_frame_time = curr_time;
 
         // End the current frame and display its contents on screen
         window.display();
