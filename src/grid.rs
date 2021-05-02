@@ -1,11 +1,11 @@
 use sfml::system::{Vector2i};
 use std::convert::{TryInto};
-use std::marker::{Sized};
 
 #[derive(Clone)]
 pub struct Particle {
     pub p_type: ParticleType,
-    pub velocity: Vector2i
+    pub velocity: Vector2i,
+    pub pressure: Vector2i
 }
 
 #[derive(Clone, PartialEq)]
@@ -23,23 +23,12 @@ pub struct Grid {
     pub grid: Vec<Particle>
 }
 
-pub trait GridExt {
-    fn new(width: i32, height: i32) -> Grid;
-    fn get(&mut self, x: i32, y: i32) -> &mut Particle;
-    fn set(&mut self, x: i32, y: i32, p: &Particle);
-
-    fn set_type(&mut self, x: i32, y: i32, p_type: ParticleType);
-    fn set_velocity(&mut self, x: i32, y: i32, velocity: Vector2i);
-    fn reset_velocity(&mut self, x: i32, y: i32);
-    fn is_empty(&mut self, x: i32, y: i32) -> bool;
-    fn translate(&mut self, x1: i32, y1: i32, x2: i32, y2: i32);
-}
-
-impl GridExt for Grid {
-    fn new(width: i32, height: i32) -> Grid {
+impl Grid {
+    pub fn new(width: i32, height: i32) -> Grid {
         let empty = Particle {
             p_type: ParticleType::Empty,
-            velocity: Vector2i::new(0, 0)
+            velocity: Vector2i::new(0, 0),
+            pressure: Vector2i::new(0, 0),
         };
 
         Grid {
@@ -49,27 +38,27 @@ impl GridExt for Grid {
         }
     }
 
-    fn get(&mut self, x: i32, y: i32) -> &mut Particle {
+    pub fn get(&mut self, x: i32, y: i32) -> &mut Particle {
         &mut self.grid[(x + y * self.width) as usize]
     }
 
-    fn set(&mut self, x: i32, y: i32, p: &Particle) {
+    pub fn set(&mut self, x: i32, y: i32, p: &Particle) {
         self.grid[(x + y * self.width) as usize] = p.clone();
     }
 
-    fn set_type(&mut self, x: i32, y: i32, p_type: ParticleType) {
+    pub fn set_type(&mut self, x: i32, y: i32, p_type: ParticleType) {
         self.grid[(x + y * self.width) as usize].p_type = p_type;
     }
 
-    fn set_velocity(&mut self, x: i32, y: i32, velocity: Vector2i) {
+    pub fn set_velocity(&mut self, x: i32, y: i32, velocity: Vector2i) {
         self.get(x, y).velocity = velocity;
     }
 
-    fn reset_velocity(&mut self, x: i32, y: i32) {
+    pub fn reset_velocity(&mut self, x: i32, y: i32) {
         self.set_velocity(x, y, Vector2i::new(0, 0));
     }
 
-    fn is_empty(&mut self, x: i32, y: i32) -> bool {
+    pub fn is_empty(&mut self, x: i32, y: i32) -> bool {
         if x < 0 || x >= self.width || y < 0 || y >= self.height {
             false
         } else {
@@ -77,7 +66,7 @@ impl GridExt for Grid {
         }
     }
 
-    fn translate(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
+    pub fn translate(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
         if x2 >= 0 && x2 < self.width && y2 >= 0 && y2 < self.height {
             let p1 = self.get(x1, y1);
             self.grid[(x2 + y2 * self.width) as usize] = p1.clone();

@@ -1,12 +1,15 @@
 use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Text, Font};
 use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::window::mouse::{Button};
-use sfml::system::{Vector2i, Vector2f, Clock, SfStr, SfStrConv};
+use sfml::system::{Vector2i, Vector2f, Clock};
 use std::convert::{TryInto};
 use core::ops::Deref;
 
 mod grid;
 use grid::*;
+
+mod fps;
+use fps::*;
 
 pub struct RenderContext {
     pub scale: f32,
@@ -95,12 +98,13 @@ fn isaac_newton(grid: &mut Grid) {
 }
 
 fn create_simple_grid() -> Grid {
-    let mut grid = Grid::new(800, 400);
+    let mut grid = Grid::new(200, 100);
 
     for y in 10..(grid.height - 10) {
         grid.set(grid.width / 2, y, & Particle {
             p_type: ParticleType::Sand,
-            velocity: Vector2i::new(0, 0)
+            velocity: Vector2i::new(0, 0),
+            pressure: Vector2i::new(0, 0)
         });
     }
 
@@ -108,7 +112,8 @@ fn create_simple_grid() -> Grid {
         for x in 0..10 {
             grid.set(x, y, & Particle {
                 p_type: ParticleType::Water,
-                velocity: Vector2i::new(0, 0)
+                velocity: Vector2i::new(0, 0),
+                pressure: Vector2i::new(0, 0)
             });
         }
     }
@@ -154,7 +159,8 @@ fn insert_particle(
 
     grid.set(x, y, & Particle {
         p_type: p_type.clone(),
-        velocity: Vector2i::new(0, 0)
+        velocity: Vector2i::new(0, 0),
+        pressure: Vector2i::new(0, 0)
     });
 }
  
@@ -164,12 +170,20 @@ fn new_particle_shape(color: Color, scale: f32) -> RectangleShape<'static> {
     rect
 }
 
+fn average(arr: &[f32]) -> f32 {
+    let mut s = 0.0;
+    for i in arr {
+        s += i / arr.len() as f32;
+    }
+    s
+}
+
 fn main() {
     let mut grid = create_simple_grid();
 
     let desktop = VideoMode::desktop_mode();
 
-    let scale = 2.0;
+    let scale = 8.0;
 
     let mut context = RenderContext {
         scale: scale,
@@ -204,15 +218,15 @@ fn main() {
     let mut mouse_x = 0;
     let mut mouse_y = 0;
 
-    let mut last_frame_time = 0.0;
-
     let font = Font::from_file("assets/Jura-Medium.ttf").unwrap();
 
-    let mut text = Text::default();
-    text.set_font(font.deref());
-    text.set_position(Vector2f::new(0.0, 0.0));
-    text.set_character_size(24);
-    text.set_fill_color(Color::WHITE);
+    let mut fps_text = Text::default();
+    fps_text.set_font(font.deref());
+    fps_text.set_position(Vector2f::new(0.0, 0.0));
+    fps_text.set_character_size(24);
+    fps_text.set_fill_color(Color::WHITE);
+
+    let mut fps_counter = FpsCounter::new();
 
     while window.is_open() {
         // Event processing
@@ -274,13 +288,9 @@ fn main() {
         render_grid(&window, &mut context, &mut grid);
 
         // Render the FPS
-
-        let fps = 1.0 / (curr_time - last_frame_time as f32);
-
-        text.set_string(&format!("{:.0}", fps));
-        window.draw(&text);
-
-        last_frame_time = curr_time;
+        fps_counter.tick(curr_time);
+        fps_text.set_string(&format!("{:.0}", fps_counter.get_display_fps()));
+        window.draw(&fps_text);
 
         // End the current frame and display its contents on screen
         window.display();
