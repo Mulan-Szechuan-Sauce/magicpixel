@@ -1,9 +1,8 @@
-use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Text, Font};
+use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Font};
 use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::window::mouse::{Button};
 use sfml::system::{Vector2i, Vector2f, Clock};
 use std::convert::{TryInto};
-use core::ops::Deref;
 
 mod grid;
 use grid::*;
@@ -219,14 +218,7 @@ fn main() {
     let mut mouse_y = 0;
 
     let font = Font::from_file("assets/Jura-Medium.ttf").unwrap();
-
-    let mut fps_text = Text::default();
-    fps_text.set_font(font.deref());
-    fps_text.set_position(Vector2f::new(0.0, 0.0));
-    fps_text.set_character_size(24);
-    fps_text.set_fill_color(Color::WHITE);
-
-    let mut fps_counter = FpsCounter::new();
+    let mut fps_counter = FpsCounter::new(&font);
 
     while window.is_open() {
         // Event processing
@@ -289,8 +281,7 @@ fn main() {
 
         // Render the FPS
         fps_counter.tick(curr_time);
-        fps_text.set_string(&format!("{:.0}", fps_counter.get_display_fps()));
-        window.draw(&fps_text);
+        window.draw(fps_counter.get_display_text());
 
         // End the current frame and display its contents on screen
         window.display();
