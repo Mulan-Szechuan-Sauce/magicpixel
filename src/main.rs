@@ -4,96 +4,22 @@ use sfml::window::mouse::{Button};
 use sfml::system::{Vector2i, Vector2f, Clock};
 use std::convert::{TryInto};
 
+mod physics;
+use physics::Physics;
+
+mod batched;
+
 mod grid;
 use grid::*;
 
 mod fps;
-use fps::*;
+use fps::{FpsCounter};
 
 pub struct RenderContext {
     pub scale: f32,
     pub water_rect: RectangleShape<'static>,
     pub sand_rect: RectangleShape<'static>,
     pub wood_rect: RectangleShape<'static>
-}
-
-fn move_sand(grid: &mut Grid, x: i32, y: i32) {
-    if grid.is_empty(x, y + 1) {
-        grid.translate(x, y, x, y + 1)
-    } else if grid.is_empty(x - 1, y + 1) {
-        grid.translate(x, y, x - 1, y + 1)
-    } else if grid.is_empty(x + 1, y + 1) {
-        grid.translate(x, y, x + 1, y + 1)
-    }
-}
-
-#[derive(Debug)]
-struct TranslateOp {
-    pub x1: i32,
-    pub y1: i32,
-    pub x2: i32,
-    pub y2: i32,
-}
-
-trait TranslateOpExt {
-    fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> TranslateOp;
-}
-
-impl TranslateOpExt for TranslateOp {
-    fn new(x1: i32, y1: i32, x2: i32, y2: i32) -> TranslateOp {
-        TranslateOp {
-            x1: x1,
-            y1: y1,
-            x2: x2,
-            y2: y2,
-        }
-    }
-}
-
-fn move_water(grid: &mut Grid, x: i32, y: i32) -> Option<TranslateOp> {
-    if grid.is_empty(x, y + 1) {
-        Some(TranslateOp::new(x, y, x, y + 1))
-    } else if grid.is_empty(x - 1, y + 1) {
-        grid.get(x, y).velocity = Vector2i::new(-1, 0);
-        Some(TranslateOp::new(x, y, x - 1, y + 1))
-    } else if grid.is_empty(x + 1, y + 1) {
-        grid.get(x, y).velocity = Vector2i::new(1, 0);
-        Some(TranslateOp::new(x, y, x + 1, y + 1))
-    } else if grid.is_empty(x + 1, y) && grid.get(x, y).velocity.x > 0 {
-        Some(TranslateOp::new(x, y, x + 1, y))
-    } else if grid.is_empty(x - 1, y) && grid.get(x, y).velocity.x < 0 {
-        Some(TranslateOp::new(x, y, x - 1, y))
-    } else {
-        None
-    }
-}
-
-fn isaac_newton(grid: &mut Grid) {
-    for y in (0..grid.height).rev() {
-        let mut batched_translations: Vec<TranslateOp> = Vec::new();
-
-        for x in 0..grid.width {
-            let particle = grid.get(x, y);
-
-            match particle.p_type {
-                ParticleType::Sand => move_sand(grid, x, y),
-                ParticleType::Water => match move_water(grid, x, y) {
-                    Some(val) => {
-                        batched_translations.push(val)
-                    },
-                    None => {}
-                },
-                _ => {}
-            }
-
-        }
-
-        for thing in batched_translations {
-            if grid.is_empty(thing.x2, thing.y2) {
-                grid.translate(thing.x1, thing.y1, thing.x2, thing.y2);
-            }
-        }
-    }
 }
 
 fn create_simple_grid() -> Grid {
@@ -169,14 +95,6 @@ fn new_particle_shape(color: Color, scale: f32) -> RectangleShape<'static> {
     rect
 }
 
-fn average(arr: &[f32]) -> f32 {
-    let mut s = 0.0;
-    for i in arr {
-        s += i / arr.len() as f32;
-    }
-    s
-}
-
 fn main() {
     let mut grid = create_simple_grid();
 
@@ -220,6 +138,8 @@ fn main() {
     let font = Font::from_file("assets/Jura-Medium.ttf").unwrap();
     let mut fps_counter = FpsCounter::new(&font);
 
+    let mut physics_mode = batched::BatchedPhysics {};
+
     while window.is_open() {
         // Event processing
         while let Some(event) = window.poll_event() {
@@ -230,7 +150,7 @@ fn main() {
                     window.close(),
                 Event::KeyPressed { code: Key::P, .. } =>
                     is_paused = !is_paused,
-                Event::MouseWheelScrolled { delta, .. } => {
+                Event::MouseWheelScrolled { .. } => {
                     // TODO: Make this less waste once we have more particles
                     if draw_p_type == ParticleType::Water {
                         draw_p_type = ParticleType::Sand;
@@ -243,7 +163,7 @@ fn main() {
                     mouse_x = x;
                     mouse_y = y;
                 },
-                Event::MouseButtonReleased { button: Button::LEFT, x, y } => {
+                Event::MouseButtonReleased { button: Button::LEFT, .. } => {
                     is_depressed = false;
                 },
                 Event::MouseMoved { x, y } => {
@@ -271,7 +191,7 @@ fn main() {
         if curr_tick > prev_tick {
             while prev_tick < curr_tick {
                 if ! is_paused {
-                    isaac_newton(&mut grid);
+                    physics_mode.update(&mut grid);
                 }
                 prev_tick += 1;
             }
