@@ -5,7 +5,6 @@ use std::convert::{TryInto};
 pub struct Particle {
     pub p_type: ParticleType,
     pub velocity: Vector2i,
-    pub pressure: Vector2i
 }
 
 #[derive(Clone, PartialEq)]
@@ -27,8 +26,7 @@ impl Grid {
     pub fn new(width: i32, height: i32) -> Grid {
         let empty = Particle {
             p_type: ParticleType::Empty,
-            velocity: Vector2i::new(0, 0),
-            pressure: Vector2i::new(0, 0),
+            velocity: Vector2i::new(0, 0)
         };
 
         Grid {

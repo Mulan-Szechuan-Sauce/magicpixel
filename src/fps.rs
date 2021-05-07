@@ -1,5 +1,8 @@
 use sfml::graphics::{Color, Transformable, Text, Font};
 use sfml::system::{Vector2f};
+use sfml::SfBox;
+
+use std::ops::Deref;
 
 const FPS_DISPLAY_TIME_DELTA: f32 = 0.1;
 const FPS_HISTORY_SIZE: usize = 10;
@@ -9,13 +12,21 @@ pub struct FpsCounter<'a> {
     last_tick_time: f32,
     fps_history: [f32; FPS_HISTORY_SIZE],
     fps_history_next: usize,
-    text: Text<'a>,
+    pub text: Text<'a>,
+    pub font: SfBox<Font>,
 }
 
 impl<'a> FpsCounter<'a> {
-    pub fn new(font: &'a Font) -> FpsCounter<'a> {
+    pub fn new() -> FpsCounter<'a> {
+        let font: SfBox<Font> = Font::from_file("assets/Jura-Medium.ttf").unwrap();
+
         let mut text = Text::default();
-        text.set_font(font);
+
+        unsafe {
+            let fp = font.deref() as *const Font;
+            text.set_font(&*fp);
+        }
+
         text.set_position(Vector2f::new(0.0, 0.0));
         text.set_character_size(24);
         text.set_fill_color(Color::WHITE);
@@ -25,7 +36,8 @@ impl<'a> FpsCounter<'a> {
             last_tick_time: 0.0,
             fps_history: [0.0; FPS_HISTORY_SIZE],
             fps_history_next: 0,
-            text: text
+            text: text,
+            font: font
         }
     }
 

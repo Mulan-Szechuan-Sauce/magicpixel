@@ -3,6 +3,7 @@ use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::window::mouse::{Button};
 use sfml::system::{Vector2i, Vector2f, Clock};
 use std::convert::{TryInto};
+use std::ops::Deref;
 
 mod physics;
 use physics::Physics;
@@ -14,6 +15,33 @@ use grid::*;
 
 mod fps;
 use fps::{FpsCounter};
+
+
+use std::rc::Rc;
+
+pub struct Child {
+    pub word: Rc<String>,
+}
+
+pub struct Parent {
+    pub word: Rc<String>,
+    pub child: Child,
+}
+
+impl Parent {
+    pub fn new() -> Parent {
+        let word: Rc<String> = Rc::new("hello".to_string());
+
+        let c = Child {
+            word: Rc::clone(&word)
+        };
+
+        Parent {
+            word: word,
+            child: c,
+        }
+    }
+}
 
 pub struct RenderContext {
     pub scale: f32,
@@ -28,17 +56,15 @@ fn create_simple_grid() -> Grid {
     for y in 10..(grid.height - 10) {
         grid.set(grid.width / 2, y, & Particle {
             p_type: ParticleType::Sand,
-            velocity: Vector2i::new(0, 0),
-            pressure: Vector2i::new(0, 0)
+            velocity: Vector2i::new(0, 0)
         });
     }
 
     for y in 0..(grid.height - 10) {
-        for x in 0..10 {
+        for x in 20..40 {
             grid.set(x, y, & Particle {
                 p_type: ParticleType::Water,
-                velocity: Vector2i::new(0, 0),
-                pressure: Vector2i::new(0, 0)
+                velocity: Vector2i::new(0, 0)
             });
         }
     }
@@ -57,7 +83,6 @@ fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &mut Gr
             let p = grid.get(x, y);
 
             match p.p_type {
-                ParticleType::Empty => {}
                 ParticleType::Wood => {
                     render_particle(window, context.scale, &mut context.wood_rect, x, y);
                 },
@@ -66,7 +91,8 @@ fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &mut Gr
                 },
                 ParticleType::Sand => {
                     render_particle(window, context.scale, &mut context.sand_rect, x, y);
-                }
+                },
+                _ => {}
             }
         }
     }
@@ -84,8 +110,7 @@ fn insert_particle(
 
     grid.set(x, y, & Particle {
         p_type: p_type.clone(),
-        velocity: Vector2i::new(0, 0),
-        pressure: Vector2i::new(0, 0)
+        velocity: Vector2i::new(0, 0)
     });
 }
  
@@ -135,8 +160,7 @@ fn main() {
     let mut mouse_x = 0;
     let mut mouse_y = 0;
 
-    let font = Font::from_file("assets/Jura-Medium.ttf").unwrap();
-    let mut fps_counter = FpsCounter::new(&font);
+    let mut fps_counter = FpsCounter::new();
 
     let mut physics_mode = batched::BatchedPhysics {};
 
