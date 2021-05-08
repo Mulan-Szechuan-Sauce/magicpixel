@@ -1,14 +1,11 @@
-use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Font};
+use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable};
 use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::window::mouse::{Button};
 use sfml::system::{Vector2i, Vector2f, Clock};
 use std::convert::{TryInto};
-use std::ops::Deref;
 
 mod physics;
 use physics::Physics;
-
-mod batched;
 
 mod grid;
 use grid::*;
@@ -56,7 +53,7 @@ fn create_simple_grid() -> Grid {
     for y in 10..(grid.height - 10) {
         grid.set(grid.width / 2, y, Particle {
             p_type: ParticleType::Sand,
-            velocity: Vector2i::new(0, 0)
+            ..Default::default()
         });
     }
 
@@ -64,7 +61,6 @@ fn create_simple_grid() -> Grid {
     //     for x in 20..40 {
     //         grid.set(x, y, & Particle {
     //             p_type: ParticleType::Water,
-    //             velocity: Vector2i::new(0, 0)
     //         });
     //     }
     // }
@@ -110,7 +106,7 @@ fn insert_particle(
 
     grid.set(x, y, Particle {
         p_type: p_type.clone(),
-        velocity: Vector2i::new(0, 0)
+        ..Default::default()
     });
 }
  
@@ -121,7 +117,7 @@ fn new_particle_shape(color: Color, scale: f32) -> RectangleShape<'static> {
 }
 
 fn main() {
-    let mut grid = create_simple_grid();
+    let grid = create_simple_grid();
 
     let desktop = VideoMode::desktop_mode();
 
@@ -162,7 +158,7 @@ fn main() {
 
     let mut fps_counter = FpsCounter::new();
 
-    let mut physics = batched::BatchedPhysics::new(grid.clone());
+    let mut physics = Physics::new(grid);
 
     while window.is_open() {
         // Event processing

@@ -1,10 +1,20 @@
-use sfml::system::{Vector2i};
 use std::convert::{TryInto};
+
+use fraction::Fraction;
 
 #[derive(Clone, Debug)]
 pub struct Particle {
     pub p_type: ParticleType,
-    pub velocity: Vector2i,
+    pub fill_ratio: Fraction,
+}
+
+impl Default for Particle {
+    fn default() -> Particle {
+        Particle {
+            p_type: ParticleType::Empty,
+            fill_ratio: Fraction::new(1u8, 1u8),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -24,20 +34,11 @@ pub struct Grid {
 
 impl Grid {
     pub fn new(width: i32, height: i32) -> Grid {
-        let empty = Particle {
-            p_type: ParticleType::Empty,
-            velocity: Vector2i::new(0, 0)
-        };
-
         Grid {
             width: width,
             height: height,
-            grid: vec![empty; (width * height).try_into().unwrap()]
+            grid: vec![Default::default(); (width * height).try_into().unwrap()]
         }
-    }
-
-    fn mut_get(&mut self, x: i32, y: i32) -> &mut Particle {
-        &mut self.grid[(x + y * self.width) as usize]
     }
 
     pub fn get(&self, x: i32, y: i32) -> &Particle {
@@ -46,18 +47,6 @@ impl Grid {
 
     pub fn set(&mut self, x: i32, y: i32, p: Particle) {
         self.grid[(x + y * self.width) as usize] = p;
-    }
-
-    pub fn set_type(&mut self, x: i32, y: i32, p_type: ParticleType) {
-        self.grid[(x + y * self.width) as usize].p_type = p_type;
-    }
-
-    pub fn set_velocity(&mut self, x: i32, y: i32, velocity: Vector2i) {
-        self.mut_get(x, y).velocity = velocity;
-    }
-
-    pub fn reset_velocity(&mut self, x: i32, y: i32) {
-        self.set_velocity(x, y, Vector2i::new(0, 0));
     }
 
     pub fn is_empty(&self, x: i32, y: i32) -> bool {
@@ -73,18 +62,12 @@ impl Grid {
     }
 
     pub fn clear(&mut self, x: i32, y: i32) {
-        self.set(x, y, Particle {
-            p_type: ParticleType::Empty,
-            velocity: Vector2i::new(0, 0),
-        })
+        self.set(x, y, Default::default())
     }
 
     pub fn clear_all(&mut self) {
         for i in 0..self.grid.len() {
-            self.grid[i] = Particle {
-                p_type: ParticleType::Empty,
-                velocity: Vector2i::new(0, 0),
-            }
+            self.grid[i] = Default::default()
         }
     }
 }
