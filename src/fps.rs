@@ -18,7 +18,8 @@ pub struct FpsCounter<'a> {
 
 impl<'a> FpsCounter<'a> {
     pub fn new() -> FpsCounter<'a> {
-        let font: SfBox<Font> = Font::from_file("assets/Jura-Medium.ttf").unwrap();
+        // FIXME:
+        let font: SfBox<Font> = Font::from_file("/home/elijah/code/magicpixel/assets/Jura-Medium.ttf").unwrap();
 
         let mut text = Text::default();
 

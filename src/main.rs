@@ -54,20 +54,20 @@ fn create_simple_grid() -> Grid {
     let mut grid = Grid::new(200, 100);
 
     for y in 10..(grid.height - 10) {
-        grid.set(grid.width / 2, y, & Particle {
+        grid.set(grid.width / 2, y, Particle {
             p_type: ParticleType::Sand,
             velocity: Vector2i::new(0, 0)
         });
     }
 
-    for y in 0..(grid.height - 10) {
-        for x in 20..40 {
-            grid.set(x, y, & Particle {
-                p_type: ParticleType::Water,
-                velocity: Vector2i::new(0, 0)
-            });
-        }
-    }
+    // for y in 0..(grid.height - 10) {
+    //     for x in 20..40 {
+    //         grid.set(x, y, & Particle {
+    //             p_type: ParticleType::Water,
+    //             velocity: Vector2i::new(0, 0)
+    //         });
+    //     }
+    // }
 
     grid
 }
@@ -77,7 +77,7 @@ fn render_particle(window: &RenderWindow, scale: f32, rect: &mut RectangleShape,
     window.draw_rectangle_shape(&rect, &RenderStates::default());
 }
 
-fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &mut Grid) {
+fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &Grid) {
     for x in 0..grid.width {
         for y in 0..grid.height {
             let p = grid.get(x, y);
@@ -108,7 +108,7 @@ fn insert_particle(
     let x = (mouse_x as f32 / context.scale) as i32;
     let y = (mouse_y as f32 / context.scale) as i32;
 
-    grid.set(x, y, & Particle {
+    grid.set(x, y, Particle {
         p_type: p_type.clone(),
         velocity: Vector2i::new(0, 0)
     });
@@ -162,7 +162,7 @@ fn main() {
 
     let mut fps_counter = FpsCounter::new();
 
-    let mut physics_mode = batched::BatchedPhysics {};
+    let mut physics = batched::BatchedPhysics::new(grid.clone());
 
     while window.is_open() {
         // Event processing
@@ -206,7 +206,7 @@ fn main() {
         // FIXME: Run on a UI thread instead
 
         if is_depressed {
-            insert_particle(&mut grid, &context, mouse_x, mouse_y, &draw_p_type);
+            insert_particle(physics.get_grid(), &context, mouse_x, mouse_y, &draw_p_type);
         }
 
         let curr_time = clock.elapsed_time().as_seconds();
@@ -215,13 +215,13 @@ fn main() {
         if curr_tick > prev_tick {
             while prev_tick < curr_tick {
                 if ! is_paused {
-                    physics_mode.update(&mut grid);
+                    physics.update();
                 }
                 prev_tick += 1;
             }
         }
 
-        render_grid(&window, &mut context, &mut grid);
+        render_grid(&window, &mut context, physics.get_grid());
 
         // Render the FPS
         fps_counter.tick(curr_time);
