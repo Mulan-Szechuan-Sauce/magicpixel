@@ -49,8 +49,8 @@ pub struct RenderContext {
     pub display_pixels: Box<[u8]>,
 }
 
-fn create_simple_grid() -> Grid {
-    let mut grid = Grid::new(50, 25);
+fn create_simple_grid() -> ParticleGrid {
+    let mut grid = ParticleGrid::new(50, 25);
 
     // for y in 10..(grid.height - 10) {
     //     grid.set(grid.width / 2, y, Particle {
@@ -109,7 +109,7 @@ fn render_particle(window: &RenderWindow, context: &mut RenderContext, p: &Parti
     window.draw_rectangle_shape(&rect, &RenderStates::default());
 }
 
-fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &Grid) {
+fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &ParticleGrid) {
     for x in 0..grid.width {
         for y in 0..grid.height {
             let p = grid.get(x, y);
@@ -120,11 +120,11 @@ fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &Grid) 
         }
     }
 
-    //let mut pixels: [u8] = 
+    //context.display_pixels
 }
 
 fn insert_particle(
-    grid: &mut Grid,
+    grid: &mut ParticleGrid,
     context: &RenderContext,
     mouse_x: i32,
     mouse_y: i32,

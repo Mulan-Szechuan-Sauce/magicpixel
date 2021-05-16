@@ -2,16 +2,19 @@ use std::mem::swap;
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
-use crate::grid::{Grid, Particle, ParticleType};
+use crate::grid::{Grid, ParticleGrid, Particle, ParticleType};
 
 pub struct Physics {
     rng: ThreadRng,
-    prev_grid: Box<Grid>,
-    next_grid: Box<Grid>,
+    prev_grid: Box<ParticleGrid>,
+    next_grid: Box<ParticleGrid>,
+    updated_grid: Grid<bool>,
 }
 
 impl Physics {
-    pub fn new(grid: Grid) -> Physics {
+    pub fn new(grid: ParticleGrid) -> Physics {
+        let bool_grid = Grid::new(grid.width, grid.height);
+
         let grid1 = grid.clone();
         let grid2 = grid;
 
@@ -19,10 +22,11 @@ impl Physics {
             rng: rand::thread_rng(),
             prev_grid: Box::new(grid1),
             next_grid: Box::new(grid2),
+            updated_grid: bool_grid,
         }
     }
 
-    pub fn get_grid(&mut self) -> &mut Box<Grid> {
+    pub fn get_grid(&mut self) -> &mut Box<ParticleGrid> {
         &mut self.prev_grid
     }
 
@@ -75,10 +79,11 @@ impl Physics {
             return false;
         }
 
-        let src_fill_ratio = self.fill_ratio_at(x1, y1);
-        let tgt_fill_ratio = self.fill_ratio_at(x2, y2);
+        let src_fill_ratio = self.prev_grid.fill_ratio_at(x1, y1);
+        let tgt_fill_ratio = self.prev_grid.fill_ratio_at(x2, y2);
+        let next_tgt_fill_ratio = self.next_grid.fill_ratio_at(x2, y2);
 
-        let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
+        let net_fill_ratio = src_fill_ratio + tgt_fill_ratio + next_tgt_fill_ratio;
 
         let new_src_fill_ratio = net_fill_ratio / 2 + net_fill_ratio % 2;
         let new_tgt_fill_ratio = net_fill_ratio / 2;
@@ -109,19 +114,9 @@ impl Physics {
         let src_tile = self.prev_grid.get(x1, y1);
         let tgt_tile = self.prev_grid.get(x2, y2);
 
-        self.next_grid.get(x2, y2).p_type == ParticleType::Empty &&
-            (src_tile.p_type == tgt_tile.p_type
-             && src_tile.fill_ratio > tgt_tile.fill_ratio
-             || tgt_tile.p_type == ParticleType::Empty)
-    }
-
-    fn fill_ratio_at(&mut self, x: i32, y: i32) -> u8 {
-        let tile = self.prev_grid.get(x, y);
-        if tile.p_type == ParticleType::Empty {
-            0
-        } else {
-            tile.fill_ratio
-        }
+        src_tile.p_type == tgt_tile.p_type
+            && src_tile.fill_ratio > tgt_tile.fill_ratio
+            || tgt_tile.p_type == ParticleType::Empty
     }
 
     pub fn update(&mut self) {
