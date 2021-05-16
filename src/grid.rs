@@ -1,18 +1,18 @@
 use std::convert::{TryInto};
 
-use fraction::Fraction;
+pub const MAX_FILL: u8 = 4;
 
 #[derive(Clone, Debug)]
 pub struct Particle {
     pub p_type: ParticleType,
-    pub fill_ratio: Fraction,
+    pub fill_ratio: u8,
 }
 
 impl Default for Particle {
     fn default() -> Particle {
         Particle {
             p_type: ParticleType::Empty,
-            fill_ratio: Fraction::new(1u8, 1u8),
+            fill_ratio: MAX_FILL,
         }
     }
 }

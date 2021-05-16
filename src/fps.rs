@@ -13,21 +13,13 @@ pub struct FpsCounter<'a> {
     fps_history: [f32; FPS_HISTORY_SIZE],
     fps_history_next: usize,
     pub text: Text<'a>,
-    pub font: SfBox<Font>,
 }
 
 impl<'a> FpsCounter<'a> {
-    pub fn new() -> FpsCounter<'a> {
-        // FIXME:
-        let font: SfBox<Font> = Font::from_file("/home/elijah/code/magicpixel/assets/Jura-Medium.ttf").unwrap();
-
+    pub fn new(font: &'a Font) -> FpsCounter<'a> {
         let mut text = Text::default();
 
-        unsafe {
-            let fp = font.deref() as *const Font;
-            text.set_font(&*fp);
-        }
-
+        text.set_font(font);
         text.set_position(Vector2f::new(0.0, 0.0));
         text.set_character_size(24);
         text.set_fill_color(Color::WHITE);
@@ -38,7 +30,6 @@ impl<'a> FpsCounter<'a> {
             fps_history: [0.0; FPS_HISTORY_SIZE],
             fps_history_next: 0,
             text: text,
-            font: font
         }
     }
 

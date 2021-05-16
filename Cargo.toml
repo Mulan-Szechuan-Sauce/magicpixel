@@ -9,4 +9,3 @@ edition = "2018"
 [dependencies]
 sfml = "0.16.0"
 rand = "0.8.3"
-fraction = "0.8.0"
