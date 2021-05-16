@@ -1,4 +1,4 @@
-use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Text, Font, Texture};
+use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Text, Font, Texture, Sprite};
 use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::window::mouse::{Button};
 use sfml::system::{Vector2i, Vector2f, Clock};
@@ -50,7 +50,7 @@ pub struct RenderContext {
 }
 
 fn create_simple_grid() -> ParticleGrid {
-    let mut grid = ParticleGrid::new(50, 25);
+    let mut grid = ParticleGrid::new(100, 50);
 
     // for y in 10..(grid.height - 10) {
     //     grid.set(grid.width / 2, y, Particle {
@@ -59,8 +59,8 @@ fn create_simple_grid() -> ParticleGrid {
     //     });
     // }
 
-    // for y in 0..(grid.height - 10) {
-    //     for x in 20..40 {
+    // for y in 0..(grid.height) {
+    //     for x in 0..(grid.width) {
     //         grid.set(x, y, Particle {
     //             p_type: ParticleType::Water,
     //             ..Default::default()
@@ -73,51 +73,52 @@ fn create_simple_grid() -> ParticleGrid {
     //     ..Default::default()
     // });
 
-    grid.set(5, 24, Particle {
-        p_type: ParticleType::Water,
-        fill_ratio: 3,
-        ..Default::default()
-    });
-    grid.set(6, 24, Particle {
-        p_type: ParticleType::Water,
-        fill_ratio: 1,
-        ..Default::default()
-    });
-
     grid
 }
 
-fn render_particle(window: &RenderWindow, context: &mut RenderContext, p: &Particle, x: i32, y: i32) {
-    let scale = context.scale;
-    let rect = &mut context.rect;
-
-    match p.p_type {
-        ParticleType::Water => {
-            let baz: u64 = 255u64 * p.fill_ratio as u64 / MAX_FILL as u64;
-            rect.set_fill_color(Color::rgba(0, 0, 255, baz as u8));
-        },
-        ParticleType::Sand => {
-            rect.set_fill_color(Color::rgb(194, 178, 128));
-        },
-        _ => {}
-    }
-
-    rect.set_position(Vector2f::new(x as f32 * scale, y as f32 * scale));
-    window.draw_rectangle_shape(&rect, &RenderStates::default());
-}
-
-fn render_grid(window: &RenderWindow, context: &mut RenderContext, grid: &ParticleGrid) {
+fn render_grid(window: &mut RenderWindow, context: &mut RenderContext, grid: &ParticleGrid) {
     for x in 0..grid.width {
         for y in 0..grid.height {
             let p = grid.get(x, y);
+            let scale = context.scale as usize;
+            let fill_amount = (255u64 * p.fill_ratio as u64 / MAX_FILL as u64) as u8;
 
-            if p.p_type != ParticleType::Empty {
-                render_particle(window, context, &p, x, y);
+            for s in 0..(scale*scale) {
+                // This may be slow
+                let x_initial = x as usize * scale + s % scale;
+                let y_initial = y as usize * scale + s / scale;
+                let i = 4 * (x_initial + y_initial * scale * grid.width as usize);
+
+                match p.p_type {
+                    ParticleType::Water => {
+                        context.display_pixels[i + 0] = 0;
+                        context.display_pixels[i + 1] = 0;
+                        context.display_pixels[i + 2] = 255;
+                        context.display_pixels[i + 3] = fill_amount;
+                    },
+                    _ => {
+                        context.display_pixels[i + 0] = 0;
+                        context.display_pixels[i + 1] = 0;
+                        context.display_pixels[i + 2] = 0;
+                        context.display_pixels[i + 3] = 0;
+                    }
+                };
             }
         }
     }
 
-    //context.display_pixels
+    unsafe {
+        context.display_texture.update_from_pixels(
+            &context.display_pixels,
+            grid.width as u32 * context.scale as u32,
+            grid.height as u32 * context.scale as u32,
+            0,
+            0 
+        );
+    }
+
+    let s = Sprite::with_texture(&context.display_texture);
+    window.draw(&s);
 }
 
 fn insert_particle(
@@ -143,10 +144,12 @@ fn main() {
 
     let desktop = VideoMode::desktop_mode();
 
-    let scale = 40.0;
+    let scale = 20.0;
 
     let win_width = (grid.width as f32 * scale).ceil() as u32;
     let win_height = (grid.height as f32 * scale).ceil() as u32;
+
+    let pixel_count = (scale as usize) * scale as usize * win_width as usize * win_height as usize;
 
     let mut context = RenderContext {
         scale: scale,
@@ -154,7 +157,7 @@ fn main() {
         // FIXME:
         font: Font::from_file("/home/elijah/code/magicpixel/assets/Jura-Medium.ttf").unwrap(),
         display_texture: Texture::new(win_width, win_height).unwrap(),
-        display_pixels: vec![0; (win_width * win_height) as usize].into_boxed_slice(),
+        display_pixels: vec![0; pixel_count].into_boxed_slice(),
     };
 
     let mut window = RenderWindow::new(
@@ -244,7 +247,7 @@ fn main() {
             }
         }
 
-        render_grid(&window, &mut context, physics.get_grid());
+        render_grid(&mut window, &mut context, physics.get_grid());
 
         // Render the FPS
         fps_counter.tick(curr_time);

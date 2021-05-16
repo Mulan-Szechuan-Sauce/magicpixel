@@ -1,6 +1,6 @@
 use std::convert::{TryInto};
 
-pub const MAX_FILL: u8 = 4;
+pub const MAX_FILL: u8 = 50;
 
 #[derive(Clone, Debug)]
 pub struct Particle {

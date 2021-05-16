@@ -1,8 +1,9 @@
 use std::mem::swap;
+use std::cmp::min;
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
-use crate::grid::{Grid, ParticleGrid, Particle, ParticleType};
+use crate::grid::{Grid, ParticleGrid, Particle, ParticleType, MAX_FILL};
 
 pub struct Physics {
     rng: ThreadRng,
@@ -68,6 +69,10 @@ impl Physics {
             return true;
         }
 
+        if self.try_flow(x, y, x, y + 1) {
+            return true;
+        }
+
         if self.try_flow(x, y, x + 1, y) {
             return true;
         }
@@ -84,28 +89,42 @@ impl Physics {
             return false;
         }
 
+        let p_type = self.prev_grid.get(x1, y1).p_type.clone();
         let src_fill_ratio = self.prev_grid.fill_ratio_at(x1, y1);
         let tgt_fill_ratio = self.prev_grid.fill_ratio_at(x2, y2);
 
         let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
 
-        let new_src_fill_ratio = net_fill_ratio / 2 + net_fill_ratio % 2;
-        let new_tgt_fill_ratio = net_fill_ratio / 2;
+        let mut new_src_fill_ratio = 0;
+        let mut new_tgt_fill_ratio = 0;
+
+        if y2 > y1 {
+            new_tgt_fill_ratio = min(net_fill_ratio, MAX_FILL);
+            new_src_fill_ratio = net_fill_ratio - new_tgt_fill_ratio;
+        } else {
+            new_src_fill_ratio = net_fill_ratio / 2;
+            new_tgt_fill_ratio = new_src_fill_ratio;
+
+            if self.rng.gen() {
+                new_src_fill_ratio += net_fill_ratio % 2;
+            } else {
+                new_tgt_fill_ratio += net_fill_ratio % 2;
+            }
+        }
 
         if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
             self.next_grid.set(x1, y1, Particle {
-                p_type: ParticleType::Water,
+                p_type: p_type.clone(),
                 fill_ratio: new_src_fill_ratio,
             });
             self.has_changed_grid.set(x1, y1, true);
 
-            if net_fill_ratio / 2 > 0 {
-                self.next_grid.set(x2, y2, Particle {
-                    p_type: ParticleType::Water,
-                    fill_ratio: new_tgt_fill_ratio,
-                });
-                self.has_changed_grid.set(x2, y2, true);
-            }
+            self.next_grid.set(x2, y2, Particle {
+                p_type: p_type,
+                fill_ratio: new_tgt_fill_ratio,
+            });
+            self.has_changed_grid.set(x2, y2, true);
+
             return true;
         }
 
@@ -117,15 +136,27 @@ impl Physics {
             return false;
         }
 
+        if *self.has_changed_grid.get(x2, y2) {
+            return false;
+        }
+
         let src_tile = self.prev_grid.get(x1, y1);
         let tgt_tile = self.prev_grid.get(x2, y2);
 
-        !*self.has_changed_grid.get(x2, y2)
-            && (
-                src_tile.p_type == tgt_tile.p_type
-                    && src_tile.fill_ratio > tgt_tile.fill_ratio
-                    || tgt_tile.p_type == ParticleType::Empty
-            )
+        if tgt_tile.p_type == ParticleType::Empty {
+            return true;
+        }
+
+        if src_tile.p_type != tgt_tile.p_type {
+            return false;
+        }
+
+        // Gravity case
+        if y2 > y1 {
+            true
+        } else {
+            src_tile.fill_ratio > tgt_tile.fill_ratio
+        }
     }
 
     pub fn update(&mut self) {
