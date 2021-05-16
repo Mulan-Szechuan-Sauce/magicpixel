@@ -8,7 +8,7 @@ pub struct Physics {
     rng: ThreadRng,
     prev_grid: Box<ParticleGrid>,
     next_grid: Box<ParticleGrid>,
-    updated_grid: Grid<bool>,
+    has_changed_grid: Grid<bool>,
 }
 
 impl Physics {
@@ -22,7 +22,7 @@ impl Physics {
             rng: rand::thread_rng(),
             prev_grid: Box::new(grid1),
             next_grid: Box::new(grid2),
-            updated_grid: bool_grid,
+            has_changed_grid: bool_grid,
         }
     }
 
@@ -37,41 +37,46 @@ impl Physics {
         }
     }
 
-    fn move_sand(&mut self, x: i32, y: i32) {
+    fn try_move_sand(&mut self, x: i32, y: i32) -> bool {
         if self.next_grid.is_empty(x, y + 1) {
-            self.translate(x, y, x, y + 1)
+            self.translate(x, y, x, y + 1);
+            true
         } else if self.next_grid.is_empty(x - 1, y + 1) && self.next_grid.is_empty(x + 1, y + 1) {
             let rand_b: bool = self.rng.gen();
             let dir = if rand_b { -1 } else { 1 };
-            self.translate(x, y, x + dir, y + 1)
+            self.translate(x, y, x + dir, y + 1);
+            true
         } else if self.next_grid.is_empty(x - 1, y + 1) {
-            self.translate(x, y, x - 1, y + 1)
+            self.translate(x, y, x - 1, y + 1);
+            true
         } else if self.next_grid.is_empty(x + 1, y + 1) {
-            self.translate(x, y, x + 1, y + 1)
+            self.translate(x, y, x + 1, y + 1);
+            true
         } else {
-            self.translate(x, y, x, y)
+            false
         }
     }
     
-    fn move_water(&mut self, x: i32, y: i32) {
-        if !self.next_grid.is_empty(x, y) {
-            return;
+    fn try_move_water(&mut self, x: i32, y: i32) -> bool {
+        if *self.has_changed_grid.get(x, y) {
+            return true;
         }
 
         if self.prev_grid.is_empty(x, y + 1) {
             self.translate(x, y, x, y + 1);
-            return;
+            self.has_changed_grid.set(x, y + 1, true);
+            return true;
         }
 
         if self.try_flow(x, y, x + 1, y) {
-            return;
+            return true;
         }
 
         if self.try_flow(x, y, x - 1, y) {
-            return;
+            return true;
         }
 
-        self.translate(x, y, x, y)
+        false
     }
 
     fn try_flow(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
@@ -81,9 +86,8 @@ impl Physics {
 
         let src_fill_ratio = self.prev_grid.fill_ratio_at(x1, y1);
         let tgt_fill_ratio = self.prev_grid.fill_ratio_at(x2, y2);
-        let next_tgt_fill_ratio = self.next_grid.fill_ratio_at(x2, y2);
 
-        let net_fill_ratio = src_fill_ratio + tgt_fill_ratio + next_tgt_fill_ratio;
+        let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
 
         let new_src_fill_ratio = net_fill_ratio / 2 + net_fill_ratio % 2;
         let new_tgt_fill_ratio = net_fill_ratio / 2;
@@ -93,12 +97,14 @@ impl Physics {
                 p_type: ParticleType::Water,
                 fill_ratio: new_src_fill_ratio,
             });
+            self.has_changed_grid.set(x1, y1, true);
 
             if net_fill_ratio / 2 > 0 {
                 self.next_grid.set(x2, y2, Particle {
                     p_type: ParticleType::Water,
                     fill_ratio: new_tgt_fill_ratio,
                 });
+                self.has_changed_grid.set(x2, y2, true);
             }
             return true;
         }
@@ -114,24 +120,39 @@ impl Physics {
         let src_tile = self.prev_grid.get(x1, y1);
         let tgt_tile = self.prev_grid.get(x2, y2);
 
-        src_tile.p_type == tgt_tile.p_type
-            && src_tile.fill_ratio > tgt_tile.fill_ratio
-            || tgt_tile.p_type == ParticleType::Empty
+        !*self.has_changed_grid.get(x2, y2)
+            && (
+                src_tile.p_type == tgt_tile.p_type
+                    && src_tile.fill_ratio > tgt_tile.fill_ratio
+                    || tgt_tile.p_type == ParticleType::Empty
+            )
     }
 
     pub fn update(&mut self) {
         self.next_grid.clear_all();
+        self.has_changed_grid.clear_all();
 
         for y in (0..self.prev_grid.height).rev() {
             for x in 0..self.prev_grid.width {
-                let p_type = &self.prev_grid.get(x, y).p_type;
+                let p_type = &self.prev_grid.get(x, y).p_type.clone();
 
-                match p_type {
-                    ParticleType::Sand => self.move_sand(x, y),
-                    ParticleType::Water => self.move_water(x, y),
-                    _ => {}
+                let updated = match p_type {
+                    ParticleType::Sand  => self.try_move_sand(x, y),
+                    ParticleType::Water => self.try_move_water(x, y),
+                    ParticleType::Empty => false
+                };
+
+                if *p_type != ParticleType::Empty {
+                    self.has_changed_grid.set(x, y, updated);
                 }
+            }
+        }
 
+        for y in (0..self.prev_grid.height).rev() {
+            for x in 0..self.prev_grid.width {
+                if !*self.has_changed_grid.get(x, y) {
+                    self.translate(x, y, x, y);
+                }
             }
         }
 

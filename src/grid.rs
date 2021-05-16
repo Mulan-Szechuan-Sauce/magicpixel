@@ -60,7 +60,6 @@ impl<T> Grid<T> where T: Clone + Default {
 pub enum ParticleType {
     Sand,
     Water,
-    Wood,
     Empty
 }
 

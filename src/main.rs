@@ -92,9 +92,6 @@ fn render_particle(window: &RenderWindow, context: &mut RenderContext, p: &Parti
     let rect = &mut context.rect;
 
     match p.p_type {
-        ParticleType::Wood => {
-            rect.set_fill_color(Color::rgb(139, 69, 19));
-        },
         ParticleType::Water => {
             let baz: u64 = 255u64 * p.fill_ratio as u64 / MAX_FILL as u64;
             rect.set_fill_color(Color::rgba(0, 0, 255, baz as u8));
