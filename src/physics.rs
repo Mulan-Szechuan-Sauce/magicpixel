@@ -3,7 +3,7 @@ use std::cmp::min;
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
-use crate::grid::{Grid, ParticleGrid, Particle, ParticleType, MAX_FILL};
+use crate::grid::{Bearing, Grid, ParticleGrid, Particle, ParticleType, MAX_FILL};
 
 pub struct Physics {
     rng: ThreadRng,
@@ -63,12 +63,6 @@ impl Physics {
             return true;
         }
 
-        if self.prev_grid.is_empty(x, y + 1) {
-            self.translate(x, y, x, y + 1);
-            self.has_changed_grid.set(x, y + 1, true);
-            return true;
-        }
-
         if self.try_flow(x, y, x, y + 1) {
             return true;
         }
@@ -116,12 +110,14 @@ impl Physics {
             self.next_grid.set(x1, y1, Particle {
                 p_type: p_type.clone(),
                 fill_ratio: new_src_fill_ratio,
+                bearing: Bearing::None,
             });
             self.has_changed_grid.set(x1, y1, true);
 
             self.next_grid.set(x2, y2, Particle {
                 p_type: p_type,
                 fill_ratio: new_tgt_fill_ratio,
+                bearing: Bearing::None,
             });
             self.has_changed_grid.set(x2, y2, true);
 

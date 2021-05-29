@@ -41,7 +41,8 @@ impl RenderContext {
 
 fn create_simple_grid() -> ParticleGrid {
     #[allow(unused_mut)]
-    let mut grid = ParticleGrid::new(100, 50);
+    //let mut grid = ParticleGrid::new(100, 50);
+    let mut grid = ParticleGrid::new(10, 10);
 
     // for y in 10..(grid.height - 10) {
     //     grid.set(grid.width / 2, y, Particle {
@@ -59,10 +60,24 @@ fn create_simple_grid() -> ParticleGrid {
     //     }
     // }
 
-    // grid.set(5, 5, Particle {
-    //     p_type: ParticleType::Water,
-    //     ..Default::default()
-    // });
+    // for x in 0..100 {
+    //     grid.set(x, 49, Particle {
+    //         p_type: ParticleType::Water,
+    //         fill_ratio: 1,
+    //         ..Default::default()
+    //     });
+    // }
+
+    grid.set(8, 8, Particle {
+        p_type: ParticleType::Water,
+        fill_ratio: 4,
+        ..Default::default()
+    });
+    grid.set(9, 9, Particle {
+        p_type: ParticleType::Water,
+        fill_ratio: 4,
+        ..Default::default()
+    });
 
     grid
 }
@@ -128,12 +143,24 @@ fn insert_particle(
     }
 }
 
+fn sum_water(grid: &ParticleGrid) -> u64 {
+    let mut net_fill_ratio: u64 = 0;
+
+    for particle in &grid.grid {
+        if particle.p_type == ParticleType::Water {
+            net_fill_ratio += particle.fill_ratio as u64
+        }
+    }
+
+    return net_fill_ratio;
+}
+
 fn main() {
     let grid = create_simple_grid();
 
     let desktop = VideoMode::desktop_mode();
 
-    let scale = 20.0;
+    let scale = 80.0;
 
     let win_width = (grid.width as f32 * scale).ceil() as u32;
     let win_height = (grid.height as f32 * scale).ceil() as u32;
@@ -189,6 +216,8 @@ fn main() {
                     window.close(),
                 Event::KeyPressed { code: Key::P, .. } =>
                     is_paused = !is_paused,
+                Event::KeyPressed { code: Key::R, .. } =>
+                    physics = Physics::new(create_simple_grid()),
                 Event::KeyReleased { code: Key::SPACE, .. } =>
                     physics.update(),
                 Event::MouseWheelScrolled { .. } => {
@@ -251,13 +280,19 @@ fn main() {
         debug_text.set_character_size(24);
         debug_text.set_fill_color(Color::WHITE);
 
-        let x = (context.mouse_x as f32 / context.scale) as i32;
-        let y = (context.mouse_y as f32 / context.scale) as i32;
+        let x = context.get_mouse_grid_x();
+        let y = context.get_mouse_grid_y();
         let grid = physics.get_grid();
 
         if grid.in_bounds(x, y) {
-            let france = grid.get(x, y).fill_ratio;
-            debug_text.set_string(&format!("{}", france));
+            let particle = grid.get(x, y).clone();
+            let fr = particle.fill_ratio;
+            let p_type = particle.p_type;
+            let bearing = particle.bearing;
+
+            let water_count = sum_water(grid);
+
+            debug_text.set_string(&format!("{}, {:?}, {:?}, {}", fr, bearing, p_type, water_count));
         }
 
         window.draw(&debug_text);

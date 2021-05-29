@@ -1,11 +1,19 @@
 use std::convert::{TryInto};
 
-pub const MAX_FILL: u8 = 50;
+pub const MAX_FILL: u8 = 4;
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Bearing {
+    None,
+    Left,
+    Right,
+}
 
 #[derive(Clone, Debug)]
 pub struct Particle {
     pub p_type: ParticleType,
     pub fill_ratio: u8,
+    pub bearing: Bearing,
 }
 
 impl Default for Particle {
@@ -13,6 +21,7 @@ impl Default for Particle {
         Particle {
             p_type: ParticleType::Empty,
             fill_ratio: MAX_FILL,
+            bearing: Bearing::None,
         }
     }
 }
