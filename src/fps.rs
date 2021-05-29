@@ -1,8 +1,5 @@
 use sfml::graphics::{Color, Transformable, Text, Font};
 use sfml::system::{Vector2f};
-use sfml::SfBox;
-
-use std::ops::Deref;
 
 const FPS_DISPLAY_TIME_DELTA: f32 = 0.1;
 const FPS_HISTORY_SIZE: usize = 10;

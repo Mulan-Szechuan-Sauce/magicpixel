@@ -45,6 +45,7 @@ impl<T> Grid<T> where T: Clone + Default {
         x >= 0 && x < self.width && y >= 0 && y < self.height
     }
 
+    #[allow(dead_code)]
     pub fn clear(&mut self, x: i32, y: i32) {
         self.set(x, y, Default::default())
     }

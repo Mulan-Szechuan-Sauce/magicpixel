@@ -1,9 +1,12 @@
-use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Shape, RenderStates, Transformable, Text, Font, Texture, Sprite};
+use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Transformable, Text, Font, Texture, Sprite};
 use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::window::mouse::{Button};
 use sfml::system::{Vector2i, Vector2f, Clock};
 use std::convert::{TryInto};
 use sfml::SfBox;
+
+mod ui_grid;
+use ui_grid::draw_overlay;
 
 mod physics;
 use physics::Physics;
@@ -14,42 +17,30 @@ use grid::*;
 mod fps;
 use fps::{FpsCounter};
 
-
-use std::rc::Rc;
-
-pub struct Child {
-    pub word: Rc<String>,
-}
-
-pub struct Parent {
-    pub word: Rc<String>,
-    pub child: Child,
-}
-
-impl Parent {
-    pub fn new() -> Parent {
-        let word: Rc<String> = Rc::new("hello".to_string());
-
-        let c = Child {
-            word: Rc::clone(&word)
-        };
-
-        Parent {
-            word: word,
-            child: c,
-        }
-    }
-}
-
 pub struct RenderContext {
     pub scale: f32,
+    pub win_width: u32,
+    pub win_height: u32,
+    pub mouse_x: i32,
+    pub mouse_y: i32,
     pub rect: RectangleShape<'static>,
     pub font: SfBox<Font>,
     pub display_texture: SfBox<Texture>,
     pub display_pixels: Box<[u8]>,
 }
 
+impl RenderContext {
+    pub fn get_mouse_grid_x(&self) -> i32 {
+        (self.mouse_x as f32 / self.scale) as i32
+    }
+
+    pub fn get_mouse_grid_y(&self) -> i32 {
+        (self.mouse_y as f32 / self.scale) as i32
+    }
+}
+
 fn create_simple_grid() -> ParticleGrid {
+    #[allow(unused_mut)]
     let mut grid = ParticleGrid::new(100, 50);
 
     // for y in 10..(grid.height - 10) {
@@ -124,12 +115,10 @@ fn render_grid(window: &mut RenderWindow, context: &mut RenderContext, grid: &Pa
 fn insert_particle(
     grid: &mut ParticleGrid,
     context: &RenderContext,
-    mouse_x: i32,
-    mouse_y: i32,
     p_type: &ParticleType
 ) {
-    let x = (mouse_x as f32 / context.scale) as i32;
-    let y = (mouse_y as f32 / context.scale) as i32;
+    let x = (context.mouse_x as f32 / context.scale) as i32;
+    let y = (context.mouse_y as f32 / context.scale) as i32;
 
     if grid.in_bounds(x, y) {
         grid.set(x, y, Particle {
@@ -153,6 +142,10 @@ fn main() {
 
     let mut context = RenderContext {
         scale: scale,
+        win_width: win_width,
+        win_height: win_height,
+        mouse_x: 0,
+        mouse_y: 0,
         rect: RectangleShape::with_size(Vector2f::new(scale, scale)),
         // FIXME:
         font: Font::from_file("/home/elijah/code/magicpixel/assets/Jura-Medium.ttf").unwrap(),
@@ -178,8 +171,6 @@ fn main() {
     let mut is_paused = true;
     let mut is_depressed = false;
     let mut draw_p_type = ParticleType::Water;
-    let mut mouse_x = 0;
-    let mut mouse_y = 0;
 
     // FIXME: don't clone this, use Rc
     let fps_font = context.font.clone();
@@ -210,15 +201,15 @@ fn main() {
                 },
                 Event::MouseButtonPressed { button: Button::LEFT, x, y } => {
                     is_depressed = true;
-                    mouse_x = x;
-                    mouse_y = y;
+                    context.mouse_x = x;
+                    context.mouse_y = y;
                 },
                 Event::MouseButtonReleased { button: Button::LEFT, .. } => {
                     is_depressed = false;
                 },
                 Event::MouseMoved { x, y } => {
-                    mouse_x = x;
-                    mouse_y = y;
+                    context.mouse_x = x;
+                    context.mouse_y = y;
                 }
                 _ => { /* Do nothing */ }
             }
@@ -232,7 +223,7 @@ fn main() {
         // FIXME: Run on a UI thread instead
 
         if is_depressed {
-            insert_particle(physics.get_grid(), &context, mouse_x, mouse_y, &draw_p_type);
+            insert_particle(physics.get_grid(), &context, &draw_p_type);
         }
 
         let curr_time = clock.elapsed_time().as_seconds();
@@ -260,8 +251,8 @@ fn main() {
         debug_text.set_character_size(24);
         debug_text.set_fill_color(Color::WHITE);
 
-        let x = (mouse_x as f32 / context.scale) as i32;
-        let y = (mouse_y as f32 / context.scale) as i32;
+        let x = (context.mouse_x as f32 / context.scale) as i32;
+        let y = (context.mouse_y as f32 / context.scale) as i32;
         let grid = physics.get_grid();
 
         if grid.in_bounds(x, y) {
@@ -270,6 +261,8 @@ fn main() {
         }
 
         window.draw(&debug_text);
+
+        draw_overlay(&mut window, &context, &grid);
 
         // End the current frame and display its contents on screen
         window.display();

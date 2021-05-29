@@ -95,8 +95,8 @@ impl Physics {
 
         let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
 
-        let mut new_src_fill_ratio = 0;
-        let mut new_tgt_fill_ratio = 0;
+        let mut new_src_fill_ratio: u8;
+        let mut new_tgt_fill_ratio: u8;
 
         if y2 > y1 {
             new_tgt_fill_ratio = min(net_fill_ratio, MAX_FILL);
