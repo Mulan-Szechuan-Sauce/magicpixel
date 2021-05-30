@@ -41,24 +41,8 @@ impl RenderContext {
 
 fn create_simple_grid() -> ParticleGrid {
     #[allow(unused_mut)]
-    //let mut grid = ParticleGrid::new(100, 50);
-    let mut grid = ParticleGrid::new(10, 10);
-
-    // for y in 10..(grid.height - 10) {
-    //     grid.set(grid.width / 2, y, Particle {
-    //         p_type: ParticleType::Sand,
-    //         ..Default::default()
-    //     });
-    // }
-
-    // for y in 0..(grid.height) {
-    //     for x in 0..(grid.width) {
-    //         grid.set(x, y, Particle {
-    //             p_type: ParticleType::Water,
-    //             ..Default::default()
-    //         });
-    //     }
-    // }
+    let mut grid = ParticleGrid::new(8, 8);
+    //let mut grid = ParticleGrid::new(2, 4);
 
     // for x in 0..100 {
     //     grid.set(x, 49, Particle {
@@ -67,17 +51,6 @@ fn create_simple_grid() -> ParticleGrid {
     //         ..Default::default()
     //     });
     // }
-
-    grid.set(8, 8, Particle {
-        p_type: ParticleType::Water,
-        fill_ratio: 4,
-        ..Default::default()
-    });
-    grid.set(9, 9, Particle {
-        p_type: ParticleType::Water,
-        fill_ratio: 4,
-        ..Default::default()
-    });
 
     grid
 }
@@ -160,12 +133,19 @@ fn main() {
 
     let desktop = VideoMode::desktop_mode();
 
-    let scale = 80.0;
+    let max_win_width = 2400.0;
+    let max_win_height = 1400.0;
+
+    let scale =
+        ((max_win_width / grid.width as f32)
+          .min(max_win_height / grid.height as f32))
+          .floor();
 
     let win_width = (grid.width as f32 * scale).ceil() as u32;
     let win_height = (grid.height as f32 * scale).ceil() as u32;
 
-    let pixel_count = (scale as usize) * scale as usize * win_width as usize * win_height as usize;
+    let pixel_count = win_width as usize * win_height as usize;
+    let rgba_pixel_count = 4 * pixel_count;
 
     let mut context = RenderContext {
         scale: scale,
@@ -177,7 +157,7 @@ fn main() {
         // FIXME:
         font: Font::from_file("/home/elijah/code/magicpixel/assets/Jura-Medium.ttf").unwrap(),
         display_texture: Texture::new(win_width, win_height).unwrap(),
-        display_pixels: vec![0; pixel_count].into_boxed_slice(),
+        display_pixels: vec![0; rgba_pixel_count].into_boxed_slice(),
     };
 
     let mut window = RenderWindow::new(

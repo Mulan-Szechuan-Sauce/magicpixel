@@ -9,6 +9,16 @@ pub enum Bearing {
     Right,
 }
 
+impl Bearing {
+    pub fn flip(&self) -> Bearing {
+        match self {
+            Bearing::None  => Bearing::None,
+            Bearing::Left  => Bearing::Right,
+            Bearing::Right => Bearing::Left
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Particle {
     pub p_type: ParticleType,

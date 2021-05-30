@@ -63,22 +63,36 @@ impl Physics {
             return true;
         }
 
-        if self.try_flow(x, y, x, y + 1) {
+        if self.try_flow_down(x, y) {
             return true;
         }
 
-        if self.try_flow(x, y, x + 1, y) {
+        let current_bearing = self.prev_grid.get(x, y).bearing.clone();
+
+        let first_bearing =
+            if current_bearing != Bearing::None {
+                current_bearing
+            } else if self.rng.gen() {
+                Bearing::Left
+            } else {
+                Bearing::Right
+            };
+
+        if self.try_flow_horizontal(x, y, first_bearing.clone()) {
             return true;
         }
 
-        if self.try_flow(x, y, x - 1, y) {
+        if self.try_flow_horizontal(x, y, first_bearing.flip()) {
             return true;
         }
 
         false
     }
 
-    fn try_flow(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
+    fn try_flow_down(&mut self, x1: i32, y1: i32) -> bool {
+        let x2 = x1;
+        let y2 = y1 + 1;
+
         if !self.should_fill(x1, y1, x2, y2) {
             return false;
         }
@@ -89,22 +103,8 @@ impl Physics {
 
         let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
 
-        let mut new_src_fill_ratio: u8;
-        let mut new_tgt_fill_ratio: u8;
-
-        if y2 > y1 {
-            new_tgt_fill_ratio = min(net_fill_ratio, MAX_FILL);
-            new_src_fill_ratio = net_fill_ratio - new_tgt_fill_ratio;
-        } else {
-            new_src_fill_ratio = net_fill_ratio / 2;
-            new_tgt_fill_ratio = new_src_fill_ratio;
-
-            if self.rng.gen() {
-                new_src_fill_ratio += net_fill_ratio % 2;
-            } else {
-                new_tgt_fill_ratio += net_fill_ratio % 2;
-            }
-        }
+        let new_tgt_fill_ratio = min(net_fill_ratio, MAX_FILL);
+        let new_src_fill_ratio = net_fill_ratio - new_tgt_fill_ratio;
 
         if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
             self.next_grid.set(x1, y1, Particle {
@@ -118,6 +118,63 @@ impl Physics {
                 p_type: p_type,
                 fill_ratio: new_tgt_fill_ratio,
                 bearing: Bearing::None,
+            });
+            self.has_changed_grid.set(x2, y2, true);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    fn try_flow_horizontal(&mut self, x1: i32, y1: i32, src_bearing: Bearing) -> bool {
+        let x2 = if src_bearing == Bearing::Left { x1 - 1 } else { x1 + 1 };
+        let y2 = y1;
+
+        if !self.should_fill(x1, y1, x2, y2) {
+            return false;
+        }
+
+        let p_type = self.prev_grid.get(x1, y1).p_type.clone();
+        let src_fill_ratio = self.prev_grid.fill_ratio_at(x1, y1);
+        let tgt_fill_ratio = self.prev_grid.fill_ratio_at(x2, y2);
+
+        let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
+
+        let new_bearing =
+            if tgt_fill_ratio > src_fill_ratio {
+                self.prev_grid.get(x2, y2).bearing.clone()
+            } else if tgt_fill_ratio < src_fill_ratio {
+                src_bearing
+            } else if self.rng.gen() {
+                Bearing::Right
+            } else {
+                Bearing::Left
+            };
+
+        let mut new_src_fill_ratio: u8 = net_fill_ratio / 2;
+        let mut new_tgt_fill_ratio: u8 = new_src_fill_ratio;
+
+        if tgt_fill_ratio == 0 {
+            new_tgt_fill_ratio += net_fill_ratio % 2;
+        } else if self.rng.gen() {
+            new_tgt_fill_ratio += net_fill_ratio % 2;
+        } else {
+            new_src_fill_ratio += net_fill_ratio % 2;
+        }
+
+        if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
+            self.next_grid.set(x1, y1, Particle {
+                p_type: p_type.clone(),
+                fill_ratio: new_src_fill_ratio,
+                bearing: new_bearing.clone(),
+            });
+            self.has_changed_grid.set(x1, y1, true);
+
+            self.next_grid.set(x2, y2, Particle {
+                p_type: p_type,
+                fill_ratio: new_tgt_fill_ratio,
+                bearing: new_bearing,
             });
             self.has_changed_grid.set(x2, y2, true);
 
@@ -156,9 +213,6 @@ impl Physics {
     }
 
     pub fn update(&mut self) {
-        self.next_grid.clear_all();
-        self.has_changed_grid.clear_all();
-
         for y in (0..self.prev_grid.height).rev() {
             for x in 0..self.prev_grid.width {
                 let p_type = &self.prev_grid.get(x, y).p_type.clone();
@@ -173,16 +227,18 @@ impl Physics {
                     self.has_changed_grid.set(x, y, updated);
                 }
             }
-        }
 
-        for y in (0..self.prev_grid.height).rev() {
-            for x in 0..self.prev_grid.width {
-                if !*self.has_changed_grid.get(x, y) {
-                    self.translate(x, y, x, y);
+            // FIXME: Horribly inefficient
+            for yp in 0..self.prev_grid.height{
+                for x in 0..self.prev_grid.width {
+                    if *self.has_changed_grid.get(x, yp) {
+                        self.prev_grid.set(x, yp, self.next_grid.get(x, yp).clone());
+                        self.has_changed_grid.set(x, yp, false);
+
+                        self.next_grid.set(x, yp, Default::default());
+                    }
                 }
             }
         }
-
-        swap(&mut self.next_grid, &mut self.prev_grid);
     }
 }
