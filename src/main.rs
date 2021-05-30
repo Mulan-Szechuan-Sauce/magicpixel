@@ -41,7 +41,7 @@ impl RenderContext {
 
 fn create_simple_grid() -> ParticleGrid {
     #[allow(unused_mut)]
-    let mut grid = ParticleGrid::new(8, 8);
+    let mut grid = ParticleGrid::new(200, 200);
     //let mut grid = ParticleGrid::new(2, 4);
 
     // for x in 0..100 {

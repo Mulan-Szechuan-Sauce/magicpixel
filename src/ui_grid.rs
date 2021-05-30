@@ -5,7 +5,7 @@ use crate::{RenderContext};
 use crate::grid::{ParticleGrid};
 
 pub fn draw_overlay(window: &mut RenderWindow, context: &RenderContext, grid: &ParticleGrid) {
-    draw_grid_overlay(window, context, grid);
+    //draw_grid_overlay(window, context, grid);
     draw_mouse_highlight(window, context, grid);
 }
 

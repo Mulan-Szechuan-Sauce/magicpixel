@@ -101,24 +101,50 @@ impl Physics {
         let src_fill_ratio = self.prev_grid.fill_ratio_at(x1, y1);
         let tgt_fill_ratio = self.prev_grid.fill_ratio_at(x2, y2);
 
+        if src_fill_ratio == MAX_FILL && tgt_fill_ratio == MAX_FILL {
+            return false;
+        }
+
         let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
 
         let new_tgt_fill_ratio = min(net_fill_ratio, MAX_FILL);
         let new_src_fill_ratio = net_fill_ratio - new_tgt_fill_ratio;
 
         if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
+            let current_bearing = self.prev_grid.get(x1, y1).bearing.clone();
+
+            let new_bearing =
+                if current_bearing != Bearing::None {
+                    current_bearing
+                } else if self.rng.gen() {
+                    Bearing::Left
+                } else {
+                    Bearing::Right
+                };
+
             self.next_grid.set(x1, y1, Particle {
                 p_type: p_type.clone(),
                 fill_ratio: new_src_fill_ratio,
-                bearing: Bearing::None,
+                bearing: new_bearing.clone(),
             });
-            self.has_changed_grid.set(x1, y1, true);
-
             self.next_grid.set(x2, y2, Particle {
-                p_type: p_type,
+                p_type: p_type.clone(),
                 fill_ratio: new_tgt_fill_ratio,
                 bearing: Bearing::None,
             });
+
+            if new_src_fill_ratio > 0 {
+                self.prev_grid.set(x1, y1, Particle {
+                    p_type: p_type.clone(),
+                    fill_ratio: new_src_fill_ratio,
+                    bearing: new_bearing.clone(),
+                });
+
+                let _ = self.try_flow_horizontal(x1, y1, new_bearing.clone())
+                    || self.try_flow_horizontal(x1, y1, new_bearing.flip());
+            }
+
+            self.has_changed_grid.set(x1, y1, true);
             self.has_changed_grid.set(x2, y2, true);
 
             return true;
