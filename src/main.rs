@@ -68,20 +68,25 @@ fn render_grid(window: &mut RenderWindow, context: &mut RenderContext, grid: &Pa
                 let y_initial = y as usize * scale + s / scale;
                 let i = 4 * (x_initial + y_initial * scale * grid.width as usize);
 
-                match p.p_type {
-                    ParticleType::Water => {
-                        context.display_pixels[i + 0] = 0;
-                        context.display_pixels[i + 1] = 0;
-                        context.display_pixels[i + 2] = 255;
-                        context.display_pixels[i + 3] = fill_amount;
-                    },
-                    _ => {
-                        context.display_pixels[i + 0] = 0;
-                        context.display_pixels[i + 1] = 0;
-                        context.display_pixels[i + 2] = 0;
-                        context.display_pixels[i + 3] = 0;
-                    }
-                };
+                unsafe {
+                    let pixel_ptr: *mut u8 =
+                        context.display_pixels.as_mut_ptr().add(i);
+
+                    match p.p_type {
+                        ParticleType::Water => {
+                            *pixel_ptr.offset(0) = 0;
+                            *pixel_ptr.offset(1) = 0;
+                            *pixel_ptr.offset(2) = 255;
+                            *pixel_ptr.offset(3) = fill_amount;
+                        },
+                        _ => {
+                            *pixel_ptr.offset(0) = 0;
+                            *pixel_ptr.offset(1) = 0;
+                            *pixel_ptr.offset(2) = 0;
+                            *pixel_ptr.offset(3) = 0;
+                        }
+                    };
+                }
             }
         }
     }

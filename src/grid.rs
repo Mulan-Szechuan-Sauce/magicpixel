@@ -76,7 +76,7 @@ impl<T> Grid<T> where T: Clone + Default {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum ParticleType {
     Sand,
     Water,
