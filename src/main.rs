@@ -1,4 +1,7 @@
-use sfml::graphics::{RenderWindow, RenderTarget, Color, RectangleShape, Transformable, Text, Font, Texture, Sprite};
+use sfml::graphics::{
+    RenderWindow, RenderTarget, Color, RectangleShape,
+    Transformable, Text, Font, Texture, Sprite
+};
 use sfml::window::{VideoMode, Event, Style, Key};
 use sfml::window::mouse::{Button};
 use sfml::system::{Vector2i, Vector2f, Clock};
@@ -17,10 +20,15 @@ use grid::*;
 mod fps;
 use fps::{FpsCounter};
 
+mod render;
+use render::*;
+
 pub struct RenderContext {
     pub scale: f32,
     pub win_width: u32,
     pub win_height: u32,
+    pub grid_width: i32,
+    pub grid_height: i32,
     pub mouse_x: i32,
     pub mouse_y: i32,
     pub rect: RectangleShape<'static>,
@@ -41,7 +49,7 @@ impl RenderContext {
 
 fn create_simple_grid() -> ParticleGrid {
     #[allow(unused_mut)]
-    let mut grid = ParticleGrid::new(200, 200);
+    let mut grid = ParticleGrid::new(100, 100);
     //let mut grid = ParticleGrid::new(2, 4);
 
     // for x in 0..100 {
@@ -156,6 +164,8 @@ fn main() {
         scale: scale,
         win_width: win_width,
         win_height: win_height,
+        grid_width: grid.width,
+        grid_height: grid.height,
         mouse_x: 0,
         mouse_y: 0,
         rect: RectangleShape::with_size(Vector2f::new(scale, scale)),
@@ -190,6 +200,8 @@ fn main() {
     let mut fps_counter = FpsCounter::new(&fps_font);
 
     let mut physics = Physics::new(grid);
+
+    let mut renderer = GlslRenderer::new("assets/grid.frag".to_string(), &context);
 
     while window.is_open() {
         // Event processing
@@ -252,7 +264,7 @@ fn main() {
             }
         }
 
-        render_grid(&mut window, &mut context, physics.get_grid());
+        renderer.render(&mut window, physics.get_grid());
 
         // Render the FPS
         fps_counter.tick(curr_time);

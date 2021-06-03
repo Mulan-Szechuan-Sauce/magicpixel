@@ -1,4 +1,3 @@
-use std::mem::swap;
 use std::cmp::min;
 use rand::Rng;
 use rand::rngs::ThreadRng;
@@ -122,11 +121,16 @@ impl Physics {
                     Bearing::Right
                 };
 
-            self.next_grid.set(x1, y1, Particle {
-                p_type: p_type.clone(),
-                fill_ratio: new_src_fill_ratio,
-                bearing: new_bearing.clone(),
-            });
+            if new_src_fill_ratio == 0 {
+                self.next_grid.set(x1, y1, Default::default());
+            } else {
+                self.next_grid.set(x1, y1, Particle {
+                    p_type: p_type.clone(),
+                    fill_ratio: new_src_fill_ratio,
+                    bearing: new_bearing.clone(),
+                });
+            }
+
             self.next_grid.set(x2, y2, Particle {
                 p_type: p_type.clone(),
                 fill_ratio: new_tgt_fill_ratio,
@@ -190,18 +194,26 @@ impl Physics {
         }
 
         if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
-            self.next_grid.set(x1, y1, Particle {
-                p_type: p_type.clone(),
-                fill_ratio: new_src_fill_ratio,
-                bearing: new_bearing.clone(),
-            });
+            if new_src_fill_ratio == 0 {
+                self.next_grid.set(x1, y1, Default::default());
+            } else {
+                self.next_grid.set(x1, y1, Particle {
+                    p_type: p_type.clone(),
+                    fill_ratio: new_src_fill_ratio,
+                    bearing: new_bearing.clone(),
+                });
+            }
             self.has_changed_grid.set(x1, y1, true);
 
-            self.next_grid.set(x2, y2, Particle {
-                p_type: p_type,
-                fill_ratio: new_tgt_fill_ratio,
-                bearing: new_bearing,
-            });
+            if new_tgt_fill_ratio == 0 {
+                self.next_grid.set(x2, y2, Default::default());
+            } else {
+                self.next_grid.set(x2, y2, Particle {
+                    p_type: p_type,
+                    fill_ratio: new_tgt_fill_ratio,
+                    bearing: new_bearing,
+                });
+            }
             self.has_changed_grid.set(x2, y2, true);
 
             return true;
