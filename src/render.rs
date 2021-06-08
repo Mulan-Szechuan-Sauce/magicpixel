@@ -8,6 +8,8 @@ use crate::{RenderContext};
 
 use std::ffi::CString;
 
+use gl::types::{GLfloat, GLenum, GLuint, GLint, GLchar, GLsizeiptr, GLboolean};
+
 pub trait Renderer {
     fn render(&mut self, grid: &ParticleGrid);
 }
@@ -55,23 +57,119 @@ impl <'a> Renderer for SfmlRenderer<'a> {
 }
 
 pub struct GlslRenderer {
+    program_id: GLuint,
+    frag_shader_id: GLuint,
+    vert_shader_id: GLuint,
 }
 
-use gl::types::{GLfloat, GLenum, GLuint, GLint, GLchar, GLsizeiptr};
-
 impl GlslRenderer {
-    pub fn new(shader_path: String, context: &RenderContext) -> GlslRenderer {
-        let shader_src = std::fs::read_to_string(shader_path).expect("shader not found!");
+    pub fn new(
+        vert_shader_path: String,
+        frag_shader_path: String,
+        context: &RenderContext
+    ) -> GlslRenderer {
+        let vert_shader_src = std::fs::read_to_string(vert_shader_path).expect("shader not found!");
+        let vert_shader_id = compile_shader(&vert_shader_src, gl::VERTEX_SHADER);
 
-        compile_shader(&shader_src, gl::FRAGMENT_SHADER);
+        let frag_shader_src = std::fs::read_to_string(frag_shader_path).expect("shader not found!");
+        let frag_shader_id = compile_shader(&frag_shader_src, gl::FRAGMENT_SHADER);
+
+        let program_id = link_program(vert_shader_id, frag_shader_id);
 
         GlslRenderer {
+            frag_shader_id: frag_shader_id,
+            vert_shader_id: vert_shader_id,
+            program_id: program_id,
         }
     }
 }
 
+static vertices: [GLfloat; 9] = [
+    -1.0, -1.0, 0.0,
+     1.0, -1.0, 0.0,
+     0.0,  1.0, 0.0,
+];
+
 impl Renderer for GlslRenderer {
     fn render(&mut self, grid: &ParticleGrid) {
+        unsafe {
+            let mut vertex_array_id: GLuint = 0;
+            gl::GenVertexArrays(1, &mut vertex_array_id);
+            gl::BindVertexArray(vertex_array_id);
+
+            // This will identify our vertex buffer
+            let mut vertex_buffer_id: GLuint = 0;
+            // Generate 1 buffer, put the resulting identifier in vertexbuffer
+            gl::GenBuffers(1, &mut vertex_buffer_id);
+            // The following commands will talk about our 'vertexbuffer' buffer
+            gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer_id);
+            // Give our vertices to OpenGL.
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                (vertices.len() * std::mem::size_of::<GLfloat>()) as GLsizeiptr,
+                std::mem::transmute(&vertices[0]),
+                gl::STATIC_DRAW
+            );
+
+            // NOTE: Until this point, it should all be in the new function
+
+            // 1st attribute buffer : vertices
+            gl::EnableVertexAttribArray(0);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer_id);
+            gl::VertexAttribPointer(
+                0,                // attribute 0. No particular reason for 0, but must match the layout in the shader.
+                3,                // size
+                gl::FLOAT,        // type
+                gl::FALSE,        // normalized?
+                0,                // stride
+                std::ptr::null(), // array buffer offset
+            );
+            // Draw the triangle !
+            gl::DrawArrays(gl::TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+            gl::DisableVertexAttribArray(0);
+        }
+    }
+}
+
+fn link_program(vert_shader_id: GLuint, frag_shader_id: GLuint) -> GLuint {
+    let program_id = unsafe { gl::CreateProgram() };
+
+    let successful: bool;
+
+    unsafe {
+        gl::AttachShader(program_id, vert_shader_id);
+        gl::AttachShader(program_id, frag_shader_id);
+        gl::LinkProgram(program_id);
+
+        successful = {
+            let mut result: GLint = 0;
+            gl::GetProgramiv(program_id, gl::LINK_STATUS, &mut result);
+            result != 0
+        };
+    }
+
+    if successful {
+        program_id
+    } else {
+        panic!("Failed to link the program:\n{}", get_link_log(program_id))
+    }
+}
+
+fn get_link_log(program_id: GLuint) -> String {
+    let mut len = 0;
+    unsafe { gl::GetProgramiv(program_id, gl::INFO_LOG_LENGTH, &mut len) };
+    assert!(len > 0);
+
+    let mut buf = Vec::with_capacity(len as usize);
+    let buf_ptr = buf.as_mut_ptr() as *mut gl::types::GLchar;
+    unsafe {
+        gl::GetProgramInfoLog(program_id, len, std::ptr::null_mut(), buf_ptr);
+        buf.set_len(len as usize);
+    };
+
+    match String::from_utf8(buf) {
+        Ok(log) => log,
+        Err(vec) => panic!("Could not convert link log from buffer: {}", vec)
     }
 }
 

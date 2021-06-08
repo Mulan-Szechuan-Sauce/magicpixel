@@ -118,7 +118,11 @@ pub fn main() {
     let mut prev_tick = 0;
     let is_paused = false;
 
-    let mut renderer = GlslRenderer::new("assets/grid.frag".to_string(), &context);
+    let mut renderer = GlslRenderer::new(
+        "assets/identity.vert".to_string(),
+        "assets/simple.frag".to_string(),
+        &context
+    );
 
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -153,6 +157,8 @@ pub fn main() {
                 prev_tick += 1;
             }
         }
+
+        renderer.render(&physics.get_grid());
 
         canvas.present();
     }
