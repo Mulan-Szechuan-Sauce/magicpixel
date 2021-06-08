@@ -57,9 +57,10 @@ impl <'a> Renderer for SfmlRenderer<'a> {
 }
 
 pub struct GlslRenderer {
-    program_id: GLuint,
-    frag_shader_id: GLuint,
     vert_shader_id: GLuint,
+    frag_shader_id: GLuint,
+    vertex_buffer_id: GLuint,
+    program_id: GLuint,
 }
 
 impl GlslRenderer {
@@ -79,21 +80,26 @@ impl GlslRenderer {
         GlslRenderer {
             frag_shader_id: frag_shader_id,
             vert_shader_id: vert_shader_id,
+            vertex_buffer_id: GlslRenderer::load_fullscreen_vertex_buffer(),
             program_id: program_id,
         }
     }
-}
 
-static vertices: [GLfloat; 9] = [
-    -1.0, -1.0, 0.0,
-     1.0, -1.0, 0.0,
-     0.0,  1.0, 0.0,
-];
+    fn load_fullscreen_vertex_buffer() -> GLuint {
+        let mut vertex_array_id: GLuint = 0;
 
-impl Renderer for GlslRenderer {
-    fn render(&mut self, grid: &ParticleGrid) {
+        let vertices: [GLfloat; 18] = [
+            // Top/left triangle
+            -1.0,  1.0, 0.0,
+            -1.0, -1.0, 0.0,
+            1.0,  1.0, 0.0,
+            // Bottom/right triangle
+            1.0,  1.0, 0.0,
+            1.0, -1.0, 0.0,
+            -1.0, -1.0, 0.0,
+        ];
+
         unsafe {
-            let mut vertex_array_id: GLuint = 0;
             gl::GenVertexArrays(1, &mut vertex_array_id);
             gl::BindVertexArray(vertex_array_id);
 
@@ -110,12 +116,20 @@ impl Renderer for GlslRenderer {
                 std::mem::transmute(&vertices[0]),
                 gl::STATIC_DRAW
             );
+        }
 
-            // NOTE: Until this point, it should all be in the new function
+        vertex_array_id
+    }
+}
+
+impl Renderer for GlslRenderer {
+    fn render(&mut self, grid: &ParticleGrid) {
+        unsafe {
+            gl::UseProgram(self.program_id);
 
             // 1st attribute buffer : vertices
             gl::EnableVertexAttribArray(0);
-            gl::BindBuffer(gl::ARRAY_BUFFER, vertex_buffer_id);
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.vertex_buffer_id);
             gl::VertexAttribPointer(
                 0,                // attribute 0. No particular reason for 0, but must match the layout in the shader.
                 3,                // size
@@ -124,8 +138,9 @@ impl Renderer for GlslRenderer {
                 0,                // stride
                 std::ptr::null(), // array buffer offset
             );
-            // Draw the triangle !
-            gl::DrawArrays(gl::TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+
+            // Starting from vertex 0; 6 vertices total -> 2 triangles
+            gl::DrawArrays(gl::TRIANGLES, 0, 6);
             gl::DisableVertexAttribArray(0);
         }
     }

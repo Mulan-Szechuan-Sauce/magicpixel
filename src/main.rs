@@ -48,8 +48,8 @@ fn find_sdl_gl_driver() -> Option<u32> {
 fn create_simple_grid() -> ParticleGrid {
     let mut grid = ParticleGrid::new(100, 100);
 
-    for x in 69..80 {
-        for y in 0..1 {
+    for x in 0..100 {
+        for y in 0..5 {
             grid.set(x, y, Particle {
                 p_type: ParticleType::Water,
                 fill_ratio: 1,
@@ -120,7 +120,7 @@ pub fn main() {
 
     let mut renderer = GlslRenderer::new(
         "assets/identity.vert".to_string(),
-        "assets/simple.frag".to_string(),
+        "assets/grid.frag".to_string(),
         &context
     );
 
