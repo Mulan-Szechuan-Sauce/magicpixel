@@ -48,11 +48,11 @@ fn find_sdl_gl_driver() -> Option<u32> {
 fn create_simple_grid() -> ParticleGrid {
     let mut grid = ParticleGrid::new(100, 100);
 
-    for x in 0..100 {
+    for x in 10..20 {
         for y in 0..5 {
             grid.set(x, y, Particle {
                 p_type: ParticleType::Water,
-                fill_ratio: 1,
+                fill_ratio: MAX_FILL,
                 ..Default::default()
             });
         }
@@ -75,6 +75,9 @@ pub fn main() {
     let win_width = (grid.width as f32 * scale).ceil() as u32;
     let win_height = (grid.height as f32 * scale).ceil() as u32;
 
+    println!("{}", scale);
+    println!("{}", win_height);
+
     let mut context = RenderContext {
         scale: scale,
         win_width: win_width,
@@ -90,7 +93,7 @@ pub fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
  
-    let window = video_subsystem.window("rust-sdl2 demo", 800, 600)
+    let window = video_subsystem.window("rust-sdl2 demo", win_width, win_height)
         .position_centered()
         .opengl()
         .build()

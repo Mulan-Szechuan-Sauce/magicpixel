@@ -59,8 +59,10 @@ impl <'a> Renderer for SfmlRenderer<'a> {
 pub struct GlslRenderer {
     vert_shader_id: GLuint,
     frag_shader_id: GLuint,
-    vertex_buffer_id: GLuint,
+    vertex_array_id: GLuint,
+    grid_buffer_id: GLuint,
     program_id: GLuint,
+    pixel_data: Vec<u32>,
 }
 
 impl GlslRenderer {
@@ -77,12 +79,40 @@ impl GlslRenderer {
 
         let program_id = link_program(vert_shader_id, frag_shader_id);
 
+        let grid_size = (context.grid_width * context.grid_height) as usize;
+
+        let pixel_data: Vec<u32> = (0..(grid_size as u32)).collect();
+
         GlslRenderer {
             frag_shader_id: frag_shader_id,
             vert_shader_id: vert_shader_id,
-            vertex_buffer_id: GlslRenderer::load_fullscreen_vertex_buffer(),
+            vertex_array_id: GlslRenderer::load_fullscreen_vertex_buffer(),
+            grid_buffer_id: GlslRenderer::allocate_grid_buffer(grid_size),
             program_id: program_id,
+            pixel_data: pixel_data,
         }
+    }
+
+    fn allocate_grid_buffer(grid_size: usize) -> GLuint {
+        let mut grid_buffer_id: GLuint = 0;
+
+        unsafe {
+            gl::GenBuffers(1, &mut grid_buffer_id);
+            gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, grid_buffer_id);
+
+            gl::NamedBufferData(
+                grid_buffer_id,
+                // FIXME: Misc hard coded u16 should be well defined
+                (grid_size * std::mem::size_of::<u32>()) as GLsizeiptr,
+                std::ptr::null(),
+                // TODO: Try STREAM_DRAW to see performance diff
+                gl::DYNAMIC_DRAW
+            );
+
+            gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 3, grid_buffer_id);
+        }
+
+        grid_buffer_id
     }
 
     fn load_fullscreen_vertex_buffer() -> GLuint {
@@ -124,12 +154,28 @@ impl GlslRenderer {
 
 impl Renderer for GlslRenderer {
     fn render(&mut self, grid: &ParticleGrid) {
+        for (i, p) in grid.grid.iter().enumerate() {
+            let type_id: u32 = match p.p_type {
+                ParticleType::Water => 1 << 8,
+                _                   => 0 << 8,
+            };
+
+            self.pixel_data[i] = type_id + p.fill_ratio as u32;
+        }
+
         unsafe {
+            gl::NamedBufferSubData(
+                self.grid_buffer_id,
+                0,
+                (self.pixel_data.len() * std::mem::size_of::<u32>()) as isize,
+                std::mem::transmute(self.pixel_data.as_ptr())
+            );
+
             gl::UseProgram(self.program_id);
 
             // 1st attribute buffer : vertices
             gl::EnableVertexAttribArray(0);
-            gl::BindBuffer(gl::ARRAY_BUFFER, self.vertex_buffer_id);
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.vertex_array_id);
             gl::VertexAttribPointer(
                 0,                // attribute 0. No particular reason for 0, but must match the layout in the shader.
                 3,                // size
