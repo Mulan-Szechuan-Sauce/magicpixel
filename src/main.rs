@@ -46,7 +46,7 @@ fn find_sdl_gl_driver() -> Option<u32> {
 }
 
 fn create_simple_grid() -> ParticleGrid {
-    let mut grid = ParticleGrid::new(100, 100);
+    let mut grid = ParticleGrid::new(200, 200);
 
     for x in 10..20 {
         for y in 0..5 {
@@ -103,10 +103,6 @@ pub fn main() {
         .index(find_sdl_gl_driver().unwrap())
         .build()
         .unwrap();
- 
-    canvas.set_draw_color(Color::RGB(0, 255, 255));
-    canvas.clear();
-    canvas.present();
 
     // initialization
     gl::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const _);
@@ -138,12 +134,7 @@ pub fn main() {
             }
         }
 
-        //canvas.clear();
-
-        unsafe {
-            gl::ClearColor(0.6, 0.0, 0.8, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
+        canvas.clear();
 
         let curr_time = SystemTime::now()
             .duration_since(program_epoch)
@@ -161,7 +152,7 @@ pub fn main() {
             }
         }
 
-        renderer.render(&physics.get_grid());
+        renderer.render(&physics.get_grid(), &context);
 
         canvas.present();
     }

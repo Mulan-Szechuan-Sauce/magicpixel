@@ -1,64 +1,17 @@
 extern crate gl;
 
-use sfml::graphics::{RenderStates, RenderTarget,RenderWindow, RectangleShape, Shader};
-use sfml::system::{Vector2f};
-
-use crate::grid::{ParticleGrid, ParticleType};
+use crate::grid::{ParticleGrid, ParticleType, MAX_FILL};
 use crate::{RenderContext};
 
 use std::ffi::CString;
 
-use gl::types::{GLfloat, GLenum, GLuint, GLint, GLchar, GLsizeiptr, GLboolean};
+use gl::types::{GLfloat, GLenum, GLuint, GLint, GLchar, GLsizeiptr};
 
 pub trait Renderer {
-    fn render(&mut self, grid: &ParticleGrid);
-}
-
-pub struct SfmlRenderer<'a> {
-    shader: Shader<'a>,
-    rect: RectangleShape<'a>,
-    particles: Vec<f32>,
-}
-
-impl <'a> SfmlRenderer<'a> {
-    pub fn new(shader_path: String, context: &RenderContext) -> SfmlRenderer<'a> {
-        let mut shader = Shader::from_file(None, None, Some(shader_path.as_str())).unwrap();
-        shader.set_uniform_int("win_height", context.win_height as i32);
-        shader.set_uniform_float("scale", context.scale);
-        shader.set_uniform_int("grid_width", context.grid_width as i32);
-
-        SfmlRenderer {
-            rect: RectangleShape::with_size(
-                Vector2f::new(context.win_width as f32, context.win_height as f32)
-            ),
-            shader: shader,
-            particles: vec![0.0; context.grid_width as usize * context.grid_height as usize],
-        }
-    }
-}
-
-impl <'a> Renderer for SfmlRenderer<'a> {
-    fn render(&mut self, grid: &ParticleGrid) {
-        for (i, p) in grid.grid.iter().enumerate() {
-            let val = match p.p_type {
-                ParticleType::Water => 1.0,
-                _                   => 0.0,
-            };
-
-            self.particles[i] = val;
-        }
-
-        self.shader.set_uniform_array_float("particles", &self.particles);
-
-        let mut states = RenderStates::default();
-        states.set_shader(Some(&self.shader));
-        //window.draw_with_renderstates(&self.rect, &states);
-    }
+    fn render(&mut self, grid: &ParticleGrid, context: &RenderContext);
 }
 
 pub struct GlslRenderer {
-    vert_shader_id: GLuint,
-    frag_shader_id: GLuint,
     vertex_array_id: GLuint,
     grid_buffer_id: GLuint,
     program_id: GLuint,
@@ -81,19 +34,19 @@ impl GlslRenderer {
 
         let grid_size = (context.grid_width * context.grid_height) as usize;
 
-        let pixel_data: Vec<u32> = (0..(grid_size as u32)).collect();
+        type DataType = u32;
+        let pixel_data: Vec<DataType> = (0..(grid_size as DataType)).collect();
+        let mem_size = std::mem::size_of::<DataType>() * grid_size;
 
         GlslRenderer {
-            frag_shader_id: frag_shader_id,
-            vert_shader_id: vert_shader_id,
             vertex_array_id: GlslRenderer::load_fullscreen_vertex_buffer(),
-            grid_buffer_id: GlslRenderer::allocate_grid_buffer(grid_size),
+            grid_buffer_id: GlslRenderer::allocate_grid_buffer(mem_size),
             program_id: program_id,
             pixel_data: pixel_data,
         }
     }
 
-    fn allocate_grid_buffer(grid_size: usize) -> GLuint {
+    fn allocate_grid_buffer(mem_size: usize) -> GLuint {
         let mut grid_buffer_id: GLuint = 0;
 
         unsafe {
@@ -102,8 +55,7 @@ impl GlslRenderer {
 
             gl::NamedBufferData(
                 grid_buffer_id,
-                // FIXME: Misc hard coded u16 should be well defined
-                (grid_size * std::mem::size_of::<u32>()) as GLsizeiptr,
+                mem_size as GLsizeiptr,
                 std::ptr::null(),
                 // TODO: Try STREAM_DRAW to see performance diff
                 gl::DYNAMIC_DRAW
@@ -150,10 +102,38 @@ impl GlslRenderer {
 
         vertex_array_id
     }
+
+    fn get_uniform_location(&mut self, name: &str) -> GLint {
+        unsafe {
+            let c_str = CString::new(name.as_bytes()).unwrap();
+            gl::GetUniformLocation(self.program_id, c_str.as_ptr())
+        }
+    }
+
+    fn set_uniform_f32(&mut self, name: &str, value: f32) {
+        let loc = self.get_uniform_location(name);
+
+        unsafe {
+            gl::Uniform1f(loc, value);
+        }
+    }
+
+    pub fn set_uniform_i32(&mut self, name: &str, value: i32) {
+        let loc = self.get_uniform_location(name);
+
+        unsafe {
+            gl::Uniform1i(loc, value);
+        }
+    }
 }
 
 impl Renderer for GlslRenderer {
-    fn render(&mut self, grid: &ParticleGrid) {
+    fn render(&mut self, grid: &ParticleGrid, context: &RenderContext) {
+        self.set_uniform_i32("grid_width", context.grid_width);
+        self.set_uniform_i32("win_height", context.win_height as i32);
+        self.set_uniform_f32("scale", context.scale);
+        self.set_uniform_i32("max_fill", MAX_FILL as i32);
+
         for (i, p) in grid.grid.iter().enumerate() {
             let type_id: u32 = match p.p_type {
                 ParticleType::Water => 1 << 8,
