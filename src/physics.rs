@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::cmp::{max, min};
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
@@ -266,8 +266,7 @@ impl Physics {
                 }
             }
 
-            // FIXME: Horribly inefficient
-            for yp in 0..self.prev_grid.height{
+            for yp in y..min(self.prev_grid.height, y + 2) {
                 for x in 0..self.prev_grid.width {
                     if *self.has_changed_grid.get(x, yp) {
                         self.prev_grid.set(x, yp, self.next_grid.get(x, yp).clone());
