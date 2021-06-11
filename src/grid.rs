@@ -1,6 +1,6 @@
 use std::convert::{TryInto};
 
-pub const MAX_FILL: u8 = 64;
+pub const MAX_FILL: u8 = 4;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Bearing {
@@ -69,6 +69,7 @@ impl<T> Grid<T> where T: Clone + Default {
         self.set(x, y, Default::default())
     }
 
+    #[allow(dead_code)]
     pub fn clear_all(&mut self) {
         for i in 0..self.grid.len() {
             self.grid[i] = Default::default()
@@ -78,6 +79,7 @@ impl<T> Grid<T> where T: Clone + Default {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum ParticleType {
+    #[allow(dead_code)]
     Sand,
     Water,
     Empty

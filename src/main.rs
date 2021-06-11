@@ -61,6 +61,22 @@ fn create_simple_grid() -> ParticleGrid {
     grid
 }
 
+fn insert_particle(
+    grid: &mut ParticleGrid,
+    context: &RenderContext,
+    p_type: &ParticleType
+) {
+    let x = (context.mouse_x as f32 / context.scale) as i32;
+    let y = (context.mouse_y as f32 / context.scale) as i32;
+
+    if grid.in_bounds(x, y) {
+        grid.set(x, y, Particle {
+            p_type: p_type.clone(),
+            ..Default::default()
+        });
+    }
+}
+
 pub fn main() {
     let grid = create_simple_grid();
 
@@ -92,7 +108,7 @@ pub fn main() {
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
- 
+
     let window = video_subsystem.window("rust-sdl2 demo", win_width, win_height)
         .position_centered()
         .opengl()
@@ -123,6 +139,9 @@ pub fn main() {
         &context
     );
 
+    let mut is_depressed = false;
+    let mut is_paused = false;
+
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -130,8 +149,28 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running
                 },
+                Event::KeyDown { keycode: Some(Keycode::P), .. } => {
+                    is_paused = !is_paused;
+                },
+                Event::MouseMotion { x, y , .. } => {
+                    context.mouse_x = x;
+                    context.mouse_y = y;
+                },
+                Event::MouseButtonDown { x, y , .. } => {
+                    context.mouse_x = x;
+                    context.mouse_y = y;
+
+                    is_depressed = true;
+                },
+                Event::MouseButtonUp { .. } => {
+                    is_depressed = false;
+                },
                 _ => {}
             }
+        }
+
+        if is_depressed {
+            insert_particle(physics.get_grid(), &context, &ParticleType::Water);
         }
 
         canvas.clear();

@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 gl = "0.14.0"
 sdl2 = "0.34"
-sfml = "0.16.0"
 rand = "0.8.3"
 
 [profile.dev]
