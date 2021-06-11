@@ -1,6 +1,8 @@
 extern crate sdl2;
 extern crate gl;
 
+mod fps;
+
 mod physics;
 use physics::Physics;
 
@@ -48,7 +50,7 @@ fn find_sdl_gl_driver() -> Option<u32> {
 }
 
 fn create_simple_grid() -> ParticleGrid {
-    let mut grid = ParticleGrid::new(200, 200);
+    let mut grid = ParticleGrid::new(100, 100);
 
     for x in 10..20 {
         for y in 0..5 {
@@ -92,9 +94,6 @@ pub fn main() {
 
     let win_width = (grid.width as f32 * scale).ceil() as u32;
     let win_height = (grid.height as f32 * scale).ceil() as u32;
-
-    println!("{}", scale);
-    println!("{}", win_height);
 
     let mut context = RenderContext {
         scale: scale,
@@ -199,6 +198,6 @@ pub fn main() {
         renderer.render(&physics.get_grid(), &context);
 
         canvas.present();
-        debug_window.render();
+        debug_window.render(curr_time);
     }
 }

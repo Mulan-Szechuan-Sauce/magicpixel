@@ -6,12 +6,15 @@ use sdl2::video::{Window};
 use sdl2::pixels::Color;
 use sdl2::render::TextureQuery;
 
+use crate::fps::FpsCounter;
+
 static DEBUG_WIDTH: u32 = 300;
 static DEBUG_HEIGHT: u32 = 500;
 
 pub struct DebugWindow<'a> {
     canvas: Canvas<Window>,
     font: Font<'a, 'a>,
+    counter: FpsCounter,
 }
 
 impl <'a> DebugWindow<'a> {
@@ -34,12 +37,13 @@ impl <'a> DebugWindow<'a> {
         DebugWindow {
             canvas: canvas,
             font: font,
+            counter: FpsCounter::new(),
         }
     }
 
-    pub fn draw_text(&mut self, text: &str, x: i32, y: i32, color: Color) {
+    pub fn draw_text(&mut self, text: String, x: i32, y: i32, color: Color) {
         let surface = self.font
-            .render("Hello Rust!")
+            .render(&text)
             .blended(color)
             .map_err(|e| e.to_string()).unwrap();
 
@@ -55,11 +59,12 @@ impl <'a> DebugWindow<'a> {
         let _ = self.canvas.copy(&texture, None, Some(rect));
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, curr_time: f32) {
         self.canvas.set_draw_color(Color::RGB(0, 0, 0));
         self.canvas.clear();
 
-        self.draw_text("Hello crust!", 10, 10, Color::WHITE);
+        let fps_text = self.counter.tick(curr_time);
+        self.draw_text(format!("FPS: {}", fps_text), 10, 10, Color::WHITE);
 
         self.canvas.present();
     }
