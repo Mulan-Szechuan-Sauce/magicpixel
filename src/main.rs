@@ -10,9 +10,11 @@ use grid::*;
 mod render;
 use render::*;
 
+mod debug;
+use debug::DebugWindow;
+
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
 
 use std::time::{SystemTime};
 
@@ -106,14 +108,18 @@ pub fn main() {
 
     let mut physics = Physics::new(grid);
 
+    let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
-    let window = video_subsystem.window("rust-sdl2 demo", win_width, win_height)
+    let window = video_subsystem.window("MagicPixel", win_width, win_height)
         .position_centered()
         .opengl()
         .build()
         .unwrap();
+
+    let (debug_x, debug_y) = window.position();
+    let mut debug_window = DebugWindow::new(debug_x, debug_y, &video_subsystem, &ttf_context);
 
     let mut canvas = window.into_canvas()
         .index(find_sdl_gl_driver().unwrap())
@@ -131,7 +137,6 @@ pub fn main() {
     let program_epoch = SystemTime::now();
     let tick_time = 0.05;
     let mut prev_tick = 0;
-    let is_paused = false;
 
     let mut renderer = GlslRenderer::new(
         "assets/identity.vert".to_string(),
@@ -194,5 +199,6 @@ pub fn main() {
         renderer.render(&physics.get_grid(), &context);
 
         canvas.present();
+        debug_window.render();
     }
 }
