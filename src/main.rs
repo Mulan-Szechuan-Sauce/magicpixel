@@ -7,6 +7,7 @@ mod grid;
 mod render;
 mod debug;
 
+use std::cmp::max;
 use std::cmp::min;
 use physics::Physics;
 use grid::*;
@@ -50,10 +51,10 @@ fn find_sdl_gl_driver() -> Option<u32> {
 }
 
 fn create_simple_grid() -> ParticleGrid {
-    let mut grid = ParticleGrid::new(100, 100);
+    let mut grid = ParticleGrid::new(25, 25);
 
-    for x in 10..20 {
-        for y in 0..5 {
+    for x in 0..25 {
+        for y in 24..25 {
             grid.set(x, y, Particle {
                 p_type: ParticleType::Water,
                 fill_ratio: MAX_FILL,
@@ -155,6 +156,7 @@ pub fn main() {
 
     let mut is_depressed = false;
     let mut is_paused = false;
+    let mut draw_type = ParticleType::Sand;
 
     'running: loop {
         let events: Vec<Event> = event_pump.poll_iter().collect();
@@ -167,6 +169,13 @@ pub fn main() {
                 },
                 Event::KeyDown { keycode: Some(Keycode::P), .. } => {
                     is_paused = !is_paused;
+                },
+                Event::KeyDown { keycode: Some(Keycode::Comma), .. } => {
+                    if draw_type == ParticleType::Water {
+                        draw_type = ParticleType::Sand;
+                    } else {
+                        draw_type = ParticleType::Water;
+                    }
                 },
                 Event::MouseMotion { x, y , window_id, .. } => {
                     if window_id == main_window_id {
@@ -190,13 +199,13 @@ pub fn main() {
                 Event::MouseWheel { y, .. } => {
                     // wow impressive
                     edit_particle(physics.get_grid(), &context, |p| {
-                        let new_fill_ratio = p.fill_ratio as i32 + y;
-
-                        if new_fill_ratio <= 0 || p.p_type == ParticleType::Empty {
-                            Default::default()
+                        if p.p_type == ParticleType::Empty {
+                            p.clone()
                         } else {
+                            let new_fill_ratio = p.fill_ratio as i32 + y;
+
                             Particle {
-                                fill_ratio: min(MAX_FILL, new_fill_ratio as u8),
+                                fill_ratio: max(1, min(MAX_FILL, new_fill_ratio as u8)),
                                 ..p.clone()
                             }
                         }
@@ -215,7 +224,7 @@ pub fn main() {
         }
 
         if is_depressed {
-            insert_particle(physics.get_grid(), &context, &ParticleType::Water);
+            insert_particle(physics.get_grid(), &context, &draw_type);
         }
 
         canvas.clear();

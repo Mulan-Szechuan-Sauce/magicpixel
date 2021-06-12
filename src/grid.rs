@@ -43,9 +43,21 @@ pub struct Grid<T> where T: Clone {
     pub grid: Vec<T>
 }
 
+macro_rules! grid_index {
+    ($self:ident, $x:expr, $y:expr) => {
+        ($x + $y * $self.width) as usize
+    };
+}
+
+macro_rules! grid_at {
+    ($self:ident, $x:expr, $y:expr) => {
+        $self.grid[grid_index!($self, $x, $y)]
+    };
+}
+
 impl<T> Grid<T> where T: Clone + Default {
     pub fn get(&self, x: i32, y: i32) -> &T {
-        &self.grid[(x + y * self.width) as usize]
+        &grid_at!(self, x, y)
     }
 
     pub fn new(width: i32, height: i32) -> Grid<T> {
@@ -57,7 +69,11 @@ impl<T> Grid<T> where T: Clone + Default {
     }
 
     pub fn set(&mut self, x: i32, y: i32, p: T) {
-        self.grid[(x + y * self.width) as usize] = p;
+        grid_at!(self, x, y) = p;
+    }
+
+    pub fn swap(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
+        self.grid.swap(grid_index!(self, x1, y1), grid_index!(self, x2, y2));
     }
 
     pub fn in_bounds(&self, x: i32, y: i32) -> bool {

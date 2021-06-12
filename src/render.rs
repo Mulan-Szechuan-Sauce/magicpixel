@@ -137,6 +137,7 @@ impl Renderer for GlslRenderer {
         for (i, p) in grid.grid.iter().enumerate() {
             let type_id: u32 = match p.p_type {
                 ParticleType::Water => 1 << 8,
+                ParticleType::Sand  => 2 << 8,
                 _                   => 0 << 8,
             };
 

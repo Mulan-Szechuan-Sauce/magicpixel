@@ -6,8 +6,8 @@ use crate::grid::{Bearing, Grid, ParticleGrid, Particle, ParticleType, MAX_FILL}
 
 pub struct Physics {
     rng: ThreadRng,
-    prev_grid: Box<ParticleGrid>,
-    next_grid: Box<ParticleGrid>,
+    active_grid: Box<ParticleGrid>,
+    change_grid: Box<ParticleGrid>,
     has_changed_grid: Grid<bool>,
 }
 
@@ -20,43 +20,54 @@ impl Physics {
 
         Physics {
             rng: rand::thread_rng(),
-            prev_grid: Box::new(grid1),
-            next_grid: Box::new(grid2),
+            active_grid: Box::new(grid1),
+            change_grid: Box::new(grid2),
             has_changed_grid: bool_grid,
         }
     }
 
     pub fn get_grid(&mut self) -> &mut Box<ParticleGrid> {
-        &mut self.prev_grid
+        &mut self.active_grid
+    }
+
+    fn create_particle(&mut self, x: i32, y: i32, p_type: ParticleType) {
+        self.active_grid.set(x, y, Particle {
+            p_type: p_type,
+            ..Default::default()
+        });
     }
 
     fn translate(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
-        if self.prev_grid.in_bounds(x2, y2) {
-            let p1 = self.prev_grid.get(x1, y1);
-            self.next_grid.set(x2, y2, p1.clone());
-        }
+        self.change_grid.set(x1, y1, self.active_grid.get(x2, y2).clone());
+        self.active_grid.swap(x1, y1, x2, y2);
     }
 
-    fn try_move_sand(&mut self, x: i32, y: i32) -> bool {
-        if self.next_grid.is_empty(x, y + 1) {
-            self.translate(x, y, x, y + 1);
-            true
-        } else if self.next_grid.is_empty(x - 1, y + 1) && self.next_grid.is_empty(x + 1, y + 1) {
-            let rand_b: bool = self.rng.gen();
-            let dir = if rand_b { -1 } else { 1 };
-            self.translate(x, y, x + dir, y + 1);
-            true
-        } else if self.next_grid.is_empty(x - 1, y + 1) {
-            self.translate(x, y, x - 1, y + 1);
-            true
-        } else if self.next_grid.is_empty(x + 1, y + 1) {
-            self.translate(x, y, x + 1, y + 1);
+    fn try_displace_sand(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
+        if !self.active_grid.in_bounds(x2, y2) {
+            return false;
+        }
+
+        let p_type = self.active_grid.get(x2, y2).p_type;
+
+        if p_type == ParticleType::Water || p_type == ParticleType::Empty {
+            self.translate(x1, y1, x2, y2);
             true
         } else {
             false
         }
     }
-    
+
+    fn try_move_sand(&mut self, x: i32, y: i32) -> bool {
+        if self.try_displace_sand(x, y, x, y + 1) {
+            return true;
+        }
+
+        let first_dir = if self.rng.gen() { 1 } else { -1 };
+
+        self.try_displace_sand(x, y, x + first_dir, y + 1) ||
+            self.try_displace_sand(x, y, x - first_dir, y + 1)
+    }
+
     fn try_move_water(&mut self, x: i32, y: i32) -> bool {
         if *self.has_changed_grid.get(x, y) {
             return true;
@@ -66,7 +77,7 @@ impl Physics {
             return true;
         }
 
-        let current_bearing = self.prev_grid.get(x, y).bearing.clone();
+        let current_bearing = self.active_grid.get(x, y).bearing.clone();
 
         let first_bearing =
             if current_bearing != Bearing::None {
@@ -96,9 +107,9 @@ impl Physics {
             return false;
         }
 
-        let p_type = self.prev_grid.get(x1, y1).p_type.clone();
-        let src_fill_ratio = self.prev_grid.fill_ratio_at(x1, y1);
-        let tgt_fill_ratio = self.prev_grid.fill_ratio_at(x2, y2);
+        let p_type = self.active_grid.get(x1, y1).p_type.clone();
+        let src_fill_ratio = self.active_grid.fill_ratio_at(x1, y1);
+        let tgt_fill_ratio = self.active_grid.fill_ratio_at(x2, y2);
 
         if src_fill_ratio == MAX_FILL && tgt_fill_ratio == MAX_FILL {
             return false;
@@ -110,7 +121,7 @@ impl Physics {
         let new_src_fill_ratio = net_fill_ratio - new_tgt_fill_ratio;
 
         if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
-            let current_bearing = self.prev_grid.get(x1, y1).bearing.clone();
+            let current_bearing = self.active_grid.get(x1, y1).bearing.clone();
 
             let new_bearing =
                 if current_bearing != Bearing::None {
@@ -122,23 +133,23 @@ impl Physics {
                 };
 
             if new_src_fill_ratio == 0 {
-                self.next_grid.set(x1, y1, Default::default());
+                self.change_grid.set(x1, y1, Default::default());
             } else {
-                self.next_grid.set(x1, y1, Particle {
+                self.change_grid.set(x1, y1, Particle {
                     p_type: p_type.clone(),
                     fill_ratio: new_src_fill_ratio,
                     bearing: new_bearing.clone(),
                 });
             }
 
-            self.next_grid.set(x2, y2, Particle {
+            self.change_grid.set(x2, y2, Particle {
                 p_type: p_type.clone(),
                 fill_ratio: new_tgt_fill_ratio,
                 bearing: Bearing::None,
             });
 
             if new_src_fill_ratio > 0 {
-                self.prev_grid.set(x1, y1, Particle {
+                self.active_grid.set(x1, y1, Particle {
                     p_type: p_type.clone(),
                     fill_ratio: new_src_fill_ratio,
                     bearing: new_bearing.clone(),
@@ -165,15 +176,15 @@ impl Physics {
             return false;
         }
 
-        let p_type = self.prev_grid.get(x1, y1).p_type.clone();
-        let src_fill_ratio = self.prev_grid.fill_ratio_at(x1, y1);
-        let tgt_fill_ratio = self.prev_grid.fill_ratio_at(x2, y2);
+        let p_type = self.active_grid.get(x1, y1).p_type.clone();
+        let src_fill_ratio = self.active_grid.fill_ratio_at(x1, y1);
+        let tgt_fill_ratio = self.active_grid.fill_ratio_at(x2, y2);
 
         let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
 
         let new_bearing =
             if tgt_fill_ratio > src_fill_ratio {
-                self.prev_grid.get(x2, y2).bearing.clone()
+                self.active_grid.get(x2, y2).bearing.clone()
             } else if tgt_fill_ratio < src_fill_ratio {
                 src_bearing
             } else if self.rng.gen() {
@@ -195,9 +206,9 @@ impl Physics {
 
         if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
             if new_src_fill_ratio == 0 {
-                self.next_grid.set(x1, y1, Default::default());
+                self.change_grid.set(x1, y1, Default::default());
             } else {
-                self.next_grid.set(x1, y1, Particle {
+                self.change_grid.set(x1, y1, Particle {
                     p_type: p_type.clone(),
                     fill_ratio: new_src_fill_ratio,
                     bearing: new_bearing.clone(),
@@ -206,9 +217,9 @@ impl Physics {
             self.has_changed_grid.set(x1, y1, true);
 
             if new_tgt_fill_ratio == 0 {
-                self.next_grid.set(x2, y2, Default::default());
+                self.change_grid.set(x2, y2, Default::default());
             } else {
-                self.next_grid.set(x2, y2, Particle {
+                self.change_grid.set(x2, y2, Particle {
                     p_type: p_type,
                     fill_ratio: new_tgt_fill_ratio,
                     bearing: new_bearing,
@@ -223,7 +234,7 @@ impl Physics {
     }
 
     fn should_fill(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
-        if !self.prev_grid.in_bounds(x2, y2) {
+        if !self.active_grid.in_bounds(x2, y2) {
             return false;
         }
 
@@ -231,8 +242,8 @@ impl Physics {
             return false;
         }
 
-        let src_tile = self.prev_grid.get(x1, y1);
-        let tgt_tile = self.prev_grid.get(x2, y2);
+        let src_tile = self.active_grid.get(x1, y1);
+        let tgt_tile = self.active_grid.get(x2, y2);
 
         if tgt_tile.p_type == ParticleType::Empty {
             return true;
@@ -251,9 +262,9 @@ impl Physics {
     }
 
     pub fn update(&mut self) {
-        for y in (0..self.prev_grid.height).rev() {
-            for x in 0..self.prev_grid.width {
-                let p_type = &self.prev_grid.get(x, y).p_type.clone();
+        for y in (0..self.active_grid.height).rev() {
+            for x in 0..self.active_grid.width {
+                let p_type = &self.active_grid.get(x, y).p_type.clone();
 
                 let updated = match p_type {
                     ParticleType::Sand  => self.try_move_sand(x, y),
@@ -266,13 +277,13 @@ impl Physics {
                 }
             }
 
-            for yp in y..min(self.prev_grid.height, y + 2) {
-                for x in 0..self.prev_grid.width {
+            for yp in y..min(self.active_grid.height, y + 2) {
+                for x in 0..self.active_grid.width {
                     if *self.has_changed_grid.get(x, yp) {
-                        self.prev_grid.set(x, yp, self.next_grid.get(x, yp).clone());
+                        self.active_grid.set(x, yp, self.change_grid.get(x, yp).clone());
                         self.has_changed_grid.set(x, yp, false);
 
-                        self.next_grid.set(x, yp, Default::default());
+                        self.change_grid.set(x, yp, Default::default());
                     }
                 }
             }

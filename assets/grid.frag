@@ -25,9 +25,13 @@ void main() {
     uint p_type_id  = (val >> 8) & 0xff;
     uint fill_ratio = val & 0xff;
 
-    if (p_type_id == 0) {
-        colorOut = vec4(0.0, 0.0, 0.0, 1.0);
+    float fill_percent = fill_ratio / float(max_fill);
+
+    if (p_type_id == 1) {
+        colorOut = fill_percent * vec4(0.0, 0.0, 1.0, 1.0);
+    } else if (p_type_id == 2) {
+        colorOut = fill_percent * vec4(194.0/255, 178.0/255, 128.0/255, 1.0);
     } else {
-        colorOut = vec4(0.0, 0.0, fill_ratio / float(max_fill), 1.0);
+        colorOut = vec4(0.0, 0.0, 0.0, 1.0);
     }
 }
