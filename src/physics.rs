@@ -4,6 +4,18 @@ use rand::rngs::ThreadRng;
 
 use crate::grid::{Bearing, Grid, ParticleGrid, Particle, ParticleType, MAX_FILL};
 
+macro_rules! random_eval {
+    ($rng:expr, $x:expr, $y:expr) => {
+        if $rng.gen() {
+            $x
+            $y
+        } else {
+            $y
+            $x
+        }
+    };
+}
+
 pub struct Physics {
     rng: ThreadRng,
     active_grid: Box<ParticleGrid>,
@@ -30,13 +42,6 @@ impl Physics {
         &mut self.active_grid
     }
 
-    fn create_particle(&mut self, x: i32, y: i32, p_type: ParticleType) {
-        self.active_grid.set(x, y, Particle {
-            p_type: p_type,
-            ..Default::default()
-        });
-    }
-
     fn try_displace_sand(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
         if !self.active_grid.in_bounds(x2, y2) {
             return false;
@@ -54,224 +59,104 @@ impl Physics {
         }
     }
 
-    fn try_move_sand(&mut self, x: i32, y: i32) -> bool {
+    fn try_move_sand(&mut self, x: i32, y: i32) {
         if self.try_displace_sand(x, y, x, y + 1) {
-            return true;
+            self.has_changed_grid.set(x, y, true);
+            return;
         }
 
         let first_dir = if self.rng.gen() { 1 } else { -1 };
 
-        self.try_displace_sand(x, y, x + first_dir, y + 1) ||
-            self.try_displace_sand(x, y, x - first_dir, y + 1)
+        if self.try_displace_sand(x, y, x + first_dir, y + 1) ||
+            self.try_displace_sand(x, y, x - first_dir, y + 1) {
+            self.has_changed_grid.set(x, y, true);
+        }
     }
 
-    fn try_move_water(&mut self, x: i32, y: i32) -> bool {
-        if *self.has_changed_grid.get(x, y) {
-            return true;
+    // Inclusive right-most point of continuous water
+    fn find_water_block_end(&self, x: i32, y: i32) -> i32 {
+        let mut right_x = x;
+
+        while right_x + 1 < self.active_grid.width &&
+              self.active_grid.get(right_x + 1, y).p_type == ParticleType::Water {
+            right_x += 1;
         }
 
-        if self.try_flow_down(x, y) {
-            return true;
-        }
-
-        let current_bearing = self.active_grid.get(x, y).bearing.clone();
-
-        let first_bearing =
-            if current_bearing != Bearing::None {
-                current_bearing
-            } else if self.rng.gen() {
-                Bearing::Left
-            } else {
-                Bearing::Right
-            };
-
-        if self.try_flow_horizontal(x, y, first_bearing.clone()) {
-            return true;
-        }
-
-        if self.try_flow_horizontal(x, y, first_bearing.flip()) {
-            return true;
-        }
-
-        false
+        right_x
     }
 
-    fn try_flow_down(&mut self, x1: i32, y1: i32) -> bool {
-        let x2 = x1;
-        let y2 = y1 + 1;
+    // Slurp into the target (BFS from the target)
+    fn slurp_into(&mut self, src_left: i32, src_right: i32, src_y: i32, tgt_x: i32, tgt_y: i32) {
+        let mut bfs_left = tgt_x - 1;
+        let mut bfs_right = tgt_x + 1;
 
-        if !self.should_fill(x1, y1, x2, y2) {
-            return false;
-        }
+        while bfs_left >= src_left || bfs_right <= src_right {
+            let mut slurp_x = -1;
 
-        let p_type = self.active_grid.get(x1, y1).p_type.clone();
-        let src_fill_ratio = self.active_grid.fill_ratio_at(x1, y1);
-        let tgt_fill_ratio = self.active_grid.fill_ratio_at(x2, y2);
+            // FIXME: Randomness is broken
+            random_eval!(
+                self.rng,
+                if slurp_x < 0 && bfs_left >= src_left {
+                    if self.active_grid.get(bfs_left, src_y).fill_ratio > 1 {
+                        slurp_x = bfs_left;
+                    }
 
-        if src_fill_ratio == MAX_FILL && tgt_fill_ratio == MAX_FILL {
-            return false;
-        }
+                    bfs_left -= 1;
+                },
+                if slurp_x < 0 && bfs_right <= src_right {
+                    if self.active_grid.get(bfs_right, src_y).fill_ratio > 1 {
+                        slurp_x = bfs_right;
+                    }
+                    bfs_right += 1;
+                }
+            );
 
-        let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
-
-        let new_tgt_fill_ratio = min(net_fill_ratio, MAX_FILL);
-        let new_src_fill_ratio = net_fill_ratio - new_tgt_fill_ratio;
-
-        if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
-            let current_bearing = self.active_grid.get(x1, y1).bearing.clone();
-
-            let new_bearing =
-                if current_bearing != Bearing::None {
-                    current_bearing
-                } else if self.rng.gen() {
-                    Bearing::Left
-                } else {
-                    Bearing::Right
-                };
-
-            if new_src_fill_ratio == 0 {
-                self.change_grid.set(x1, y1, Default::default());
-            } else {
-                self.change_grid.set(x1, y1, Particle {
-                    p_type: p_type.clone(),
-                    fill_ratio: new_src_fill_ratio,
-                    bearing: new_bearing.clone(),
+            if slurp_x >= 0 {
+                self.active_grid.get_mut(slurp_x, src_y).fill_ratio -= 1;
+                self.active_grid.set(tgt_x, tgt_y, Particle {
+                    p_type: ParticleType::Water,
+                    fill_ratio: 1,
+                    ..Default::default()
                 });
+                return;
             }
-
-            self.change_grid.set(x2, y2, Particle {
-                p_type: p_type.clone(),
-                fill_ratio: new_tgt_fill_ratio,
-                bearing: Bearing::None,
-            });
-
-            if new_src_fill_ratio > 0 {
-                self.active_grid.set(x1, y1, Particle {
-                    p_type: p_type.clone(),
-                    fill_ratio: new_src_fill_ratio,
-                    bearing: new_bearing.clone(),
-                });
-
-                let _ = self.try_flow_horizontal(x1, y1, new_bearing.clone())
-                    || self.try_flow_horizontal(x1, y1, new_bearing.flip());
-            }
-
-            self.has_changed_grid.set(x1, y1, true);
-            self.has_changed_grid.set(x2, y2, true);
-
-            return true;
         }
-
-        return false;
     }
 
-    fn try_flow_horizontal(&mut self, x1: i32, y1: i32, src_bearing: Bearing) -> bool {
-        let x2 = if src_bearing == Bearing::Left { x1 - 1 } else { x1 + 1 };
-        let y2 = y1;
+    fn try_move_water(&mut self, x: i32, y: i32) -> i32 {
+        let right_x = self.find_water_block_end(x, y);
 
-        if !self.should_fill(x1, y1, x2, y2) {
-            return false;
+        if self.active_grid.is_empty(x - 1, y) {
+            self.slurp_into(x, right_x, y, x - 1, y);
+        } else if self.active_grid.is_empty(right_x + 1, y) {
+            self.slurp_into(x, right_x, y, right_x + 1, y);
         }
 
-        let p_type = self.active_grid.get(x1, y1).p_type.clone();
-        let src_fill_ratio = self.active_grid.fill_ratio_at(x1, y1);
-        let tgt_fill_ratio = self.active_grid.fill_ratio_at(x2, y2);
-
-        let net_fill_ratio = src_fill_ratio + tgt_fill_ratio;
-
-        let new_bearing =
-            if tgt_fill_ratio > src_fill_ratio {
-                self.active_grid.get(x2, y2).bearing.clone()
-            } else if tgt_fill_ratio < src_fill_ratio {
-                src_bearing
-            } else if self.rng.gen() {
-                Bearing::Right
-            } else {
-                Bearing::Left
-            };
-
-        let mut new_src_fill_ratio: u8 = net_fill_ratio / 2;
-        let mut new_tgt_fill_ratio: u8 = new_src_fill_ratio;
-
-        if tgt_fill_ratio == 0 {
-            new_tgt_fill_ratio += net_fill_ratio % 2;
-        } else if self.rng.gen() {
-            new_tgt_fill_ratio += net_fill_ratio % 2;
-        } else {
-            new_src_fill_ratio += net_fill_ratio % 2;
-        }
-
-        if src_fill_ratio != new_src_fill_ratio || tgt_fill_ratio != new_tgt_fill_ratio {
-            if new_src_fill_ratio == 0 {
-                self.change_grid.set(x1, y1, Default::default());
-            } else {
-                self.change_grid.set(x1, y1, Particle {
-                    p_type: p_type.clone(),
-                    fill_ratio: new_src_fill_ratio,
-                    bearing: new_bearing.clone(),
-                });
-            }
-            self.has_changed_grid.set(x1, y1, true);
-
-            if new_tgt_fill_ratio == 0 {
-                self.change_grid.set(x2, y2, Default::default());
-            } else {
-                self.change_grid.set(x2, y2, Particle {
-                    p_type: p_type,
-                    fill_ratio: new_tgt_fill_ratio,
-                    bearing: new_bearing,
-                });
-            }
-            self.has_changed_grid.set(x2, y2, true);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    fn should_fill(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
-        if !self.active_grid.in_bounds(x2, y2) {
-            return false;
-        }
-
-        if *self.has_changed_grid.get(x2, y2) {
-            return false;
-        }
-
-        let src_tile = self.active_grid.get(x1, y1);
-        let tgt_tile = self.active_grid.get(x2, y2);
-
-        if tgt_tile.p_type == ParticleType::Empty {
-            return true;
-        }
-
-        if src_tile.p_type != tgt_tile.p_type {
-            return false;
-        }
-
-        // Gravity case
-        if y2 > y1 {
-            true
-        } else {
-            src_tile.fill_ratio > tgt_tile.fill_ratio
-        }
+        right_x - x
     }
 
     pub fn update(&mut self) {
         for y in (0..self.active_grid.height).rev() {
-            for x in 0..self.active_grid.width {
+            let mut x = 0;
+
+            while x < self.active_grid.width {
+                if *self.has_changed_grid.get(x, y) {
+                    continue;
+                }
+
                 let p_type = &self.active_grid.get(x, y).p_type.clone();
 
-                let updated = match p_type {
+                let mut skippy_boi = 1;
+
+                match p_type {
                     ParticleType::Sand  => self.try_move_sand(x, y),
-                    ParticleType::Water => self.try_move_water(x, y),
-                    ParticleType::Empty => false
+                    ParticleType::Water => {
+                        skippy_boi += self.try_move_water(x, y);
+                    },
+                    ParticleType::Empty => {}
                 };
 
-                if *p_type != ParticleType::Empty {
-                    self.has_changed_grid.set(x, y, updated);
-                }
+                x += skippy_boi;
             }
 
             for yp in y..min(self.active_grid.height, y + 2) {

@@ -60,6 +60,10 @@ impl<T> Grid<T> where T: Clone + Default {
         &grid_at!(self, x, y)
     }
 
+    pub fn get_mut(&mut self, x: i32, y: i32) -> &mut T {
+        &mut grid_at!(self, x, y)
+    }
+
     pub fn new(width: i32, height: i32) -> Grid<T> {
         Grid::<T> {
             width: width,
