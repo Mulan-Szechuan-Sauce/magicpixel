@@ -2,21 +2,21 @@ extern crate sdl2;
 extern crate gl;
 
 mod fps;
-
 mod physics;
-use physics::Physics;
-
 mod grid;
-use grid::*;
-
 mod render;
-use render::*;
-
 mod debug;
+
+use std::cmp::min;
+use physics::Physics;
+use grid::*;
+use render::*;
 use debug::DebugWindow;
 
 use sdl2::event::Event;
+use sdl2::event::WindowEvent;
 use sdl2::keyboard::Keycode;
+use sdl2::mouse::{ MouseButton, MouseWheelDirection };
 
 use std::time::{SystemTime};
 
@@ -70,14 +70,22 @@ fn insert_particle(
     context: &RenderContext,
     p_type: &ParticleType
 ) {
+    edit_particle(grid, context, |_| {
+        Particle {
+            p_type: p_type.clone(),
+            ..Default::default()
+        }
+    });
+}
+
+fn edit_particle<F>(grid: &mut ParticleGrid, context: &RenderContext, edit_func: F) where
+    F: Fn(&Particle) -> Particle
+{
     let x = (context.mouse_x as f32 / context.scale) as i32;
     let y = (context.mouse_y as f32 / context.scale) as i32;
 
     if grid.in_bounds(x, y) {
-        grid.set(x, y, Particle {
-            p_type: p_type.clone(),
-            ..Default::default()
-        });
+        grid.set(x, y, edit_func(grid.get(x, y)));
     }
 }
 
@@ -117,6 +125,8 @@ pub fn main() {
         .build()
         .unwrap();
 
+    let main_window_id = window.id();
+
     let (debug_x, debug_y) = window.position();
     let mut debug_window = DebugWindow::new(debug_x, debug_y, &video_subsystem, &ttf_context);
 
@@ -147,7 +157,9 @@ pub fn main() {
     let mut is_paused = false;
 
     'running: loop {
-        for event in event_pump.poll_iter() {
+        let events: Vec<Event> = event_pump.poll_iter().collect();
+
+        for event in events {
             match event {
                 Event::Quit {..} |
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
@@ -156,18 +168,47 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::P), .. } => {
                     is_paused = !is_paused;
                 },
-                Event::MouseMotion { x, y , .. } => {
-                    context.mouse_x = x;
-                    context.mouse_y = y;
+                Event::MouseMotion { x, y , window_id, .. } => {
+                    if window_id == main_window_id {
+                        context.mouse_x = x;
+                        context.mouse_y = y;
+                    }
                 },
-                Event::MouseButtonDown { x, y , .. } => {
+                Event::MouseButtonDown { x, y , window_id, mouse_btn, .. } => {
                     context.mouse_x = x;
                     context.mouse_y = y;
 
-                    is_depressed = true;
+                    if window_id == main_window_id && mouse_btn == MouseButton::Left {
+                        is_depressed = true;
+                    }
                 },
-                Event::MouseButtonUp { .. } => {
+                Event::MouseButtonUp { window_id, mouse_btn, .. } => {
+                    if window_id == main_window_id && mouse_btn == MouseButton::Left {
+                        is_depressed = false;
+                    }
+                },
+                Event::MouseWheel { y, .. } => {
+                    // wow impressive
+                    edit_particle(physics.get_grid(), &context, |p| {
+                        let new_fill_ratio = p.fill_ratio as i32 + y;
+
+                        if new_fill_ratio <= 0 || p.p_type == ParticleType::Empty {
+                            Default::default()
+                        } else {
+                            Particle {
+                                fill_ratio: min(MAX_FILL, new_fill_ratio as u8),
+                                ..p.clone()
+                            }
+                        }
+                    });
+                },
+                Event::Window { win_event: WindowEvent::Leave, .. } => {
                     is_depressed = false;
+                },
+                Event::Window { win_event: WindowEvent::Enter, .. } => {
+                    if event_pump.mouse_state().left() {
+                        is_depressed = true;
+                    }
                 },
                 _ => {}
             }
@@ -198,6 +239,6 @@ pub fn main() {
         renderer.render(&physics.get_grid(), &context);
 
         canvas.present();
-        debug_window.render(curr_time);
+        debug_window.render(&physics.get_grid(), &context, curr_time);
     }
 }

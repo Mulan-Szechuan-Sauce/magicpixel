@@ -1,5 +1,8 @@
 extern crate sdl2;
 
+use crate::MAX_FILL;
+use crate::RenderContext;
+use crate::ParticleGrid;
 use sdl2::ttf::Font;
 use sdl2::render::{Canvas};
 use sdl2::video::{Window};
@@ -31,7 +34,7 @@ impl <'a> DebugWindow<'a> {
 
         let canvas = window.into_canvas().build().unwrap();
         // Load a font
-        let mut font: Font<'a, 'a> = ttf_context.load_font("assets/Jura-Medium.ttf", 24).unwrap();
+        let mut font: Font<'a, 'a> = ttf_context.load_font("assets/FiraCode-Light.ttf", 24).unwrap();
         font.set_style(sdl2::ttf::FontStyle::BOLD);
 
         DebugWindow {
@@ -41,6 +44,7 @@ impl <'a> DebugWindow<'a> {
         }
     }
 
+    // NOTE: Inefficient text rendering, but it's "ok enough"
     pub fn draw_text(&mut self, text: String, x: i32, y: i32, color: Color) {
         let surface = self.font
             .render(&text)
@@ -59,12 +63,21 @@ impl <'a> DebugWindow<'a> {
         let _ = self.canvas.copy(&texture, None, Some(rect));
     }
 
-    pub fn render(&mut self, curr_time: f32) {
+    // The year was 1995.
+    pub fn render(&mut self, grid: &ParticleGrid, context: &RenderContext, curr_time: f32) {
         self.canvas.set_draw_color(Color::RGB(0, 0, 0));
         self.canvas.clear();
 
+        let grid_y = (context.mouse_y as f32 / context.scale).floor() as i32;
+        let grid_x = (context.mouse_x as f32 / context.scale).floor() as i32;
+
+        let particle = grid.get(grid_x, grid_y);
+
         let fps_text = self.counter.tick(curr_time);
         self.draw_text(format!("FPS: {}", fps_text), 10, 10, Color::WHITE);
+        self.draw_text(format!("{:?}", particle.p_type), 10, 35, Color::WHITE);
+        self.draw_text(format!("{: >3}/{}", particle.fill_ratio, MAX_FILL), 110, 35, Color::WHITE);
+        self.draw_text(format!("{:?}", particle.bearing), 10, 60, Color::WHITE);
 
         self.canvas.present();
     }
