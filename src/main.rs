@@ -51,17 +51,17 @@ fn find_sdl_gl_driver() -> Option<u32> {
 }
 
 fn create_simple_grid() -> ParticleGrid {
-    let mut grid = ParticleGrid::new(25, 25);
+    let mut grid = ParticleGrid::new(10, 10);
 
-    for x in 0..25 {
-        for y in 24..25 {
-            grid.set(x, y, Particle {
-                p_type: ParticleType::Water,
-                fill_ratio: MAX_FILL,
-                ..Default::default()
-            });
-        }
-    }
+    // for x in 0..25 {
+    //     for y in 24..25 {
+    //         grid.set(x, y, Particle {
+    //             p_type: ParticleType::Water,
+    //             fill_ratio: MAX_FILL,
+    //             ..Default::default()
+    //         });
+    //     }
+    // }
 
     grid
 }
@@ -154,9 +154,9 @@ pub fn main() {
         &context
     );
 
-    let mut is_depressed = false;
+    let mut depression = None; // :)
     let mut is_paused = false;
-    let mut draw_type = ParticleType::Sand;
+    let mut draw_type = ParticleType::Water;
 
     'running: loop {
         let events: Vec<Event> = event_pump.poll_iter().collect();
@@ -187,13 +187,13 @@ pub fn main() {
                     context.mouse_x = x;
                     context.mouse_y = y;
 
-                    if window_id == main_window_id && mouse_btn == MouseButton::Left {
-                        is_depressed = true;
+                    if window_id == main_window_id {
+                        depression = Some(mouse_btn);
                     }
                 },
-                Event::MouseButtonUp { window_id, mouse_btn, .. } => {
-                    if window_id == main_window_id && mouse_btn == MouseButton::Left {
-                        is_depressed = false;
+                Event::MouseButtonUp { window_id, .. } => {
+                    if window_id == main_window_id {
+                        depression = None;
                     }
                 },
                 Event::MouseWheel { y, .. } => {
@@ -212,19 +212,27 @@ pub fn main() {
                     });
                 },
                 Event::Window { win_event: WindowEvent::Leave, .. } => {
-                    is_depressed = false;
+                    depression = None;
                 },
                 Event::Window { win_event: WindowEvent::Enter, .. } => {
                     if event_pump.mouse_state().left() {
-                        is_depressed = true;
+                        depression = Some(MouseButton::Left);
+                    } else if event_pump.mouse_state().right() {
+                        depression = Some(MouseButton::Right);
                     }
                 },
                 _ => {}
             }
         }
 
-        if is_depressed {
-            insert_particle(physics.get_grid(), &context, &draw_type);
+        match depression {
+            Some(MouseButton::Left) =>
+                insert_particle(physics.get_grid(), &context, &draw_type),
+            Some(MouseButton::Right) =>
+                edit_particle(physics.get_grid(), &context, |_| {
+                    Default::default()
+                }),
+            _ => {},
         }
 
         canvas.clear();

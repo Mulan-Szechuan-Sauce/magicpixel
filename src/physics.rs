@@ -37,11 +37,6 @@ impl Physics {
         });
     }
 
-    fn translate(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
-        self.change_grid.set(x1, y1, self.active_grid.get(x2, y2).clone());
-        self.active_grid.swap(x1, y1, x2, y2);
-    }
-
     fn try_displace_sand(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
         if !self.active_grid.in_bounds(x2, y2) {
             return false;
@@ -50,7 +45,9 @@ impl Physics {
         let p_type = self.active_grid.get(x2, y2).p_type;
 
         if p_type == ParticleType::Water || p_type == ParticleType::Empty {
-            self.translate(x1, y1, x2, y2);
+            // TODO: try_flow_horizontal if water instead of swapping above
+            self.change_grid.set(x1, y1, self.active_grid.get(x2, y2).clone());
+            self.active_grid.swap(x1, y1, x2, y2);
             true
         } else {
             false
