@@ -118,11 +118,12 @@ impl Physics {
 
             if slurp_x >= 0 {
                 self.active_grid.get_mut(slurp_x, src_y).fill_ratio -= 1;
-                self.active_grid.set(tgt_x, tgt_y, Particle {
+                self.change_grid.set(tgt_x, tgt_y, Particle {
                     p_type: ParticleType::Water,
                     fill_ratio: 1,
                     ..Default::default()
                 });
+                self.has_changed_grid.set(tgt_x, tgt_y, true);
                 return;
             }
         }
@@ -211,6 +212,7 @@ impl Physics {
 
             while x < self.active_grid.width {
                 if *self.has_changed_grid.get(x, y) {
+                    x += 1;
                     continue;
                 }
 
@@ -223,6 +225,7 @@ impl Physics {
                     ParticleType::Water => {
                         skippy_boi += self.try_move_water(x, y);
                     },
+                    ParticleType::Wood => {},
                     ParticleType::Empty => {}
                 };
 

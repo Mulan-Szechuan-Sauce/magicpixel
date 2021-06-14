@@ -99,7 +99,7 @@ impl<T> Grid<T> where T: Clone + Default {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum ParticleType {
-    #[allow(dead_code)]
+    Wood,
     Sand,
     Water,
     Empty

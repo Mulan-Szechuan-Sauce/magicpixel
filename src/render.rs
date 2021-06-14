@@ -138,6 +138,7 @@ impl Renderer for GlslRenderer {
             let type_id: u32 = match p.p_type {
                 ParticleType::Water => 1 << 8,
                 ParticleType::Sand  => 2 << 8,
+                ParticleType::Wood  => 3 << 8,
                 _                   => 0 << 8,
             };
 

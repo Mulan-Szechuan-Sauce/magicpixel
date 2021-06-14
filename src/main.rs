@@ -29,6 +29,7 @@ pub struct RenderContext {
     pub grid_height: i32,
     pub mouse_x: i32,
     pub mouse_y: i32,
+    pub draw_type: ParticleType,
 }
 
 impl RenderContext {
@@ -112,6 +113,7 @@ pub fn main() {
         grid_height: grid.height,
         mouse_x: 0,
         mouse_y: 0,
+        draw_type: ParticleType::Water,
     };
 
     let mut physics = Physics::new(grid);
@@ -156,7 +158,13 @@ pub fn main() {
 
     let mut depression = None; // :)
     let mut is_paused = false;
-    let mut draw_type = ParticleType::Water;
+
+    let draw_types = vec!(
+        ParticleType::Water,
+        ParticleType::Sand,
+        ParticleType::Wood,
+    );
+    let mut draw_type_index: usize = 0;
 
     'running: loop {
         let events: Vec<Event> = event_pump.poll_iter().collect();
@@ -170,12 +178,12 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::P), .. } => {
                     is_paused = !is_paused;
                 },
+                Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
+                    physics.update();
+                },
                 Event::KeyDown { keycode: Some(Keycode::Comma), .. } => {
-                    if draw_type == ParticleType::Water {
-                        draw_type = ParticleType::Sand;
-                    } else {
-                        draw_type = ParticleType::Water;
-                    }
+                    draw_type_index = (draw_type_index + 1) % draw_types.len();
+                    context.draw_type = draw_types.get(draw_type_index).unwrap().clone();
                 },
                 Event::MouseMotion { x, y , window_id, .. } => {
                     if window_id == main_window_id {
@@ -226,8 +234,10 @@ pub fn main() {
         }
 
         match depression {
-            Some(MouseButton::Left) =>
-                insert_particle(physics.get_grid(), &context, &draw_type),
+            Some(MouseButton::Left) => {
+                let draw_type = draw_types.get(draw_type_index).unwrap();
+                insert_particle(physics.get_grid(), &context, &draw_type)
+            },
             Some(MouseButton::Right) =>
                 edit_particle(physics.get_grid(), &context, |_| {
                     Default::default()

@@ -31,6 +31,8 @@ void main() {
         colorOut = fill_percent * vec4(0.0, 0.0, 1.0, 1.0);
     } else if (p_type_id == 2) {
         colorOut = fill_percent * vec4(194.0/255, 178.0/255, 128.0/255, 1.0);
+    } else if (p_type_id == 3) {
+        colorOut = fill_percent * vec4(42.0/255, 23.0/255, 11.0/255, 1.0);
     } else {
         colorOut = vec4(0.0, 0.0, 0.0, 1.0);
     }
