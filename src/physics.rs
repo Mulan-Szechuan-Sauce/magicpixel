@@ -91,18 +91,6 @@ impl Physics {
         }
     }
 
-    // Inclusive right-most point of continuous water
-    fn find_water_block_end(&self, x: i32, y: i32) -> i32 {
-        let mut right_x = x;
-
-        while right_x + 1 < self.active_grid.width &&
-              self.active_grid.get(right_x + 1, y).p_type == ParticleType::Water {
-            right_x += 1;
-        }
-
-        right_x
-    }
-
     // Slurp into the target (BFS from the target)
     fn slurp_into(&mut self, src_left: i32, src_right: i32, src_y: i32, tgt_x: i32, tgt_y: i32) {
         let mut bfs_left = tgt_x - 1;
@@ -140,16 +128,79 @@ impl Physics {
         }
     }
 
+    // Inclusive right-most point of continuous water
+    fn find_water_block_end(&self, x: i32, y: i32) -> i32 {
+        let mut right_x = x;
+
+        while right_x + 1 < self.active_grid.width &&
+              self.active_grid.get(right_x + 1, y).p_type == ParticleType::Water {
+            right_x += 1;
+        }
+
+        right_x
+    }
+
+    fn find_unfilled_in_range(&mut self, left_x: i32, right_x: i32, y: i32) -> Vec<i32> {
+        if y < 0 || y >= self.active_grid.height {
+            return Vec::new();
+        }
+
+        // Preallocate so we don't wast time on vec expansion
+        let mut unfilled = Vec::with_capacity((right_x - left_x) as usize);
+
+        for x in left_x..=right_x {
+            let particle = self.active_grid.get(x, y);
+
+            if particle.p_type == ParticleType::Empty ||
+                particle.p_type == ParticleType::Water && particle.fill_ratio < MAX_FILL {
+                unfilled.push(x);
+            }
+        }
+
+        unfilled
+    }
+
+    fn flow_down(&mut self, x: i32, y: i32) {
+        let target = self.active_grid.get(x, y + 1).clone();
+
+        if target.p_type == ParticleType::Empty {
+            self.active_grid.swap(x, y, x, y + 1);
+        } else {
+            let source = self.active_grid.get(x, y);
+
+            let net_fr = source.fill_ratio + target.fill_ratio;
+            let new_target_fr = min(MAX_FILL, net_fr);
+            let new_source_fr = net_fr - new_target_fr;
+
+            if new_source_fr == 0 {
+                self.active_grid.clear(x, y);
+            } else {
+                self.active_grid.get_mut(x, y).fill_ratio = new_source_fr;
+            }
+
+            self.active_grid.get_mut(x, y + 1).fill_ratio = new_target_fr;
+        }
+    }
+
     fn try_move_water(&mut self, x: i32, y: i32) -> i32 {
         let right_x = self.find_water_block_end(x, y);
 
-        random_condition!(
-            self.rng,
-            self.active_grid.is_empty(x - 1, y),
+        let underlings = self.find_unfilled_in_range(x, right_x, y + 1);
+
+        if underlings.len() > 0 {
+            for xi in underlings {
+                self.flow_down(xi, y);
+            }
+        } else {
+            // Horizontal flow
+            random_condition!(
+                self.rng,
+                self.active_grid.is_empty(x - 1, y),
                 self.slurp_into(x, right_x, y, x - 1, y),
-            self.active_grid.is_empty(right_x + 1, y),
+                self.active_grid.is_empty(right_x + 1, y),
                 self.slurp_into(x, right_x, y, right_x + 1, y)
-        );
+            );
+        }
 
         right_x - x
     }
