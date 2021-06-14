@@ -2,7 +2,7 @@ use std::cmp::{min};
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
-use crate::grid::{Bearing, Grid, ParticleGrid, Particle, ParticleType, MAX_FILL};
+use crate::grid::{Grid, ParticleGrid, Particle, ParticleType, MAX_FILL};
 
 macro_rules! random_eval {
     ($rng:expr, $x:expr, $y:expr) => {
@@ -14,6 +14,24 @@ macro_rules! random_eval {
             $x
         }
     };
+}
+
+macro_rules! random_condition {
+    ($rng:expr, $x_cond:expr, $x_body:expr, $y_cond:expr, $y_body:expr) => {
+        if $rng.gen() {
+            if $x_cond {
+                $x_body
+            } else if $y_cond {
+                $y_body
+            }
+        } else {
+            if $y_cond {
+                $y_body
+            } else if $x_cond {
+                $x_body
+            }
+        }
+    }
 }
 
 pub struct Physics {
@@ -93,7 +111,6 @@ impl Physics {
         while bfs_left >= src_left || bfs_right <= src_right {
             let mut slurp_x = -1;
 
-            // FIXME: Randomness is broken
             random_eval!(
                 self.rng,
                 if slurp_x < 0 && bfs_left >= src_left {
@@ -126,11 +143,13 @@ impl Physics {
     fn try_move_water(&mut self, x: i32, y: i32) -> i32 {
         let right_x = self.find_water_block_end(x, y);
 
-        if self.active_grid.is_empty(x - 1, y) {
-            self.slurp_into(x, right_x, y, x - 1, y);
-        } else if self.active_grid.is_empty(right_x + 1, y) {
-            self.slurp_into(x, right_x, y, right_x + 1, y);
-        }
+        random_condition!(
+            self.rng,
+            self.active_grid.is_empty(x - 1, y),
+                self.slurp_into(x, right_x, y, x - 1, y),
+            self.active_grid.is_empty(right_x + 1, y),
+                self.slurp_into(x, right_x, y, right_x + 1, y)
+        );
 
         right_x - x
     }
