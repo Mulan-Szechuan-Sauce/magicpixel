@@ -52,7 +52,7 @@ fn find_sdl_gl_driver() -> Option<u32> {
 }
 
 fn create_simple_grid() -> ParticleGrid {
-    let mut grid = ParticleGrid::new(10, 10);
+    let mut grid = ParticleGrid::new(200, 200);
 
     // for x in 0..25 {
     //     for y in 24..25 {

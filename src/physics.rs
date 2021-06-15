@@ -102,14 +102,16 @@ impl Physics {
             random_eval!(
                 self.rng,
                 if slurp_x < 0 && bfs_left >= src_left {
-                    if self.active_grid.get(bfs_left, src_y).fill_ratio > 1 {
+                    if self.active_grid.get(bfs_left, src_y).p_type == ParticleType::Water &&
+                        self.active_grid.get(bfs_left, src_y).fill_ratio > 1 {
                         slurp_x = bfs_left;
                     }
 
                     bfs_left -= 1;
                 },
                 if slurp_x < 0 && bfs_right <= src_right {
-                    if self.active_grid.get(bfs_right, src_y).fill_ratio > 1 {
+                    if self.active_grid.get(bfs_right, src_y).p_type == ParticleType::Water &&
+                        self.active_grid.get(bfs_right, src_y).fill_ratio > 1 {
                         slurp_x = bfs_right;
                     }
                     bfs_right += 1;
@@ -118,11 +120,15 @@ impl Physics {
 
             if slurp_x >= 0 {
                 self.active_grid.get_mut(slurp_x, src_y).fill_ratio -= 1;
-                self.change_grid.set(tgt_x, tgt_y, Particle {
-                    p_type: ParticleType::Water,
-                    fill_ratio: 1,
-                    ..Default::default()
-                });
+                let mut dirty_mut = self.change_grid.get_mut(tgt_x, tgt_y);
+
+                if dirty_mut.p_type == ParticleType::Water {
+                    dirty_mut.fill_ratio += 1;
+                } else {
+                    dirty_mut.fill_ratio = 1;
+                    dirty_mut.p_type = ParticleType::Water;
+                }
+
                 self.has_changed_grid.set(tgt_x, tgt_y, true);
                 return;
             }
@@ -183,6 +189,56 @@ impl Physics {
         }
     }
 
+    fn inner_fill(&mut self, range_left: i32, range_right: i32, x: i32, y: i32) {
+        let mut bfs_left = x - 1;
+        let mut bfs_right = x + 1;
+
+        let mut max_fr = 0;
+        let mut max_x  = -1;
+
+        let base_fr = self.active_grid.get(x, y).fill_ratio;
+
+        while bfs_left >= range_left || bfs_right <= range_right {
+            random_eval!(
+                self.rng,
+                if bfs_left >= range_left {
+                    let fr = self.active_grid.get(bfs_left, y).fill_ratio;
+
+                    if fr <= base_fr {
+                        bfs_left = range_left - 1;
+                    } else {
+                        if fr > max_fr {
+                            max_fr = fr;
+                            max_x = bfs_left;
+                        }
+
+                        bfs_left -= 1;
+                    }
+                },
+                if bfs_right <= range_right {
+                    let fr = self.active_grid.get(bfs_right, y).fill_ratio;
+
+                    if fr <= base_fr {
+                        bfs_right = range_right + 1;
+                    } else {
+                        if fr > max_fr {
+                            max_fr = fr;
+                            max_x = bfs_right;
+                        }
+
+                        bfs_right += 1;
+                    }
+                }
+            );
+        }
+
+        // Yay bfs
+        if max_fr > base_fr + 1 {
+            self.active_grid.get_mut(max_x, y).fill_ratio -= 1;
+            self.active_grid.get_mut(x, y).fill_ratio += 1;
+        }
+    }
+
     fn try_move_water(&mut self, x: i32, y: i32) -> i32 {
         let right_x = self.find_water_block_end(x, y);
 
@@ -201,6 +257,10 @@ impl Physics {
                 self.active_grid.is_empty(right_x + 1, y),
                 self.slurp_into(x, right_x, y, right_x + 1, y)
             );
+
+            for xi in x..=right_x {
+                self.inner_fill(x, right_x, xi, y);
+            }
         }
 
         right_x - x
