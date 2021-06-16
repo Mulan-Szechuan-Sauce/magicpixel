@@ -1,6 +1,6 @@
 use std::convert::{TryInto};
 
-pub const MAX_FILL: u8 = 8;
+pub const MAX_FILL: u8 = 64;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Bearing {

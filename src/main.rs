@@ -17,7 +17,7 @@ use debug::DebugWindow;
 use sdl2::event::Event;
 use sdl2::event::WindowEvent;
 use sdl2::keyboard::Keycode;
-use sdl2::mouse::{ MouseButton, MouseWheelDirection };
+use sdl2::mouse::{ MouseButton };
 
 use std::time::{SystemTime};
 

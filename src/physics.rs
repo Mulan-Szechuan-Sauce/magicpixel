@@ -182,7 +182,34 @@ impl Physics {
             if new_source_fr == 0 {
                 self.active_grid.clear(x, y);
             } else {
-                self.active_grid.get_mut(x, y).fill_ratio = new_source_fr;
+                let dir = if self.rng.gen() { 1 } else { -1 };
+
+                let canFlow = |x: i32| {
+                    self.active_grid.in_bounds(x, y) &&
+                    self.active_grid.get(x, y).p_type == ParticleType::Empty &&
+                    self.change_grid.get(x, y).p_type == ParticleType::Empty
+                };
+
+                if canFlow(x + dir) {
+                    self.active_grid.clear(x, y);
+                    self.change_grid.set(x + dir, y, Particle {
+                        p_type: ParticleType::Water,
+                        fill_ratio: new_source_fr,
+                        ..Default::default()
+                    });
+                    self.has_changed_grid.set(x + dir, y, true);
+                } else if canFlow(x - dir) {
+
+                    self.active_grid.clear(x, y);
+                    self.change_grid.set(x - dir, y, Particle {
+                        p_type: ParticleType::Water,
+                        fill_ratio: new_source_fr,
+                        ..Default::default()
+                    });
+                    self.has_changed_grid.set(x - dir, y, true);
+                } else {
+                    self.active_grid.get_mut(x, y).fill_ratio = new_source_fr;
+                }
             }
 
             self.active_grid.get_mut(x, y + 1).fill_ratio = new_target_fr;
