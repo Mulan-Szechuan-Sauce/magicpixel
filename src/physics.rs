@@ -275,6 +275,8 @@ impl Physics {
             for xi in underlings {
                 self.flow_down(xi, y);
             }
+
+            // TODO: Also horizontal flow
         } else {
             // Horizontal flow
             random_condition!(

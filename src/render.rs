@@ -134,6 +134,9 @@ impl Renderer for GlslRenderer {
         self.set_uniform_f32("scale", context.scale);
         self.set_uniform_i32("max_fill", MAX_FILL as i32);
 
+        self.set_uniform_i32("mouse_x", (context.mouse_x as f32 / context.scale) as i32);
+        self.set_uniform_i32("mouse_y", (context.mouse_y as f32 / context.scale) as i32);
+
         for (i, p) in grid.grid.iter().enumerate() {
             let type_id: u32 = match p.p_type {
                 ParticleType::Water => 1 << 8,
