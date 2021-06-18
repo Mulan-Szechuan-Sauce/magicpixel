@@ -2,7 +2,7 @@ use std::cmp::{min};
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
-use crate::grid::{Grid, ParticleGrid, ParticleType, MAX_FILL};
+use crate::grid::{Grid, Particle, ParticleGrid, ParticleType, MAX_FILL};
 
 macro_rules! random_eval {
     ($rng:expr, $x:expr, $y:expr) => {
@@ -87,6 +87,10 @@ impl Physics {
 
     // Slurp into the target (BFS from the target)
     fn slurp_into(&mut self, src_left: i32, src_right: i32, src_y: i32, tgt_x: i32, tgt_y: i32) {
+        if self.grid.get(tgt_x, tgt_y).p_type == ParticleType::Water {
+            panic!("wtf man");
+        }
+
         let mut bfs_left = tgt_x - 1;
         let mut bfs_right = tgt_x + 1;
 
@@ -113,18 +117,19 @@ impl Physics {
             );
 
             if slurp_x >= 0 {
-                self.grid.get_mut(slurp_x, src_y).fill_ratio -= 1;
-                let mut dirty_mut = self.grid.get_mut(tgt_x, tgt_y);
+                let slurp_fr = self.grid.get(slurp_x, src_y).fill_ratio;
+                let delta = slurp_fr / 2;
 
-                if dirty_mut.p_type == ParticleType::Water {
-                    dirty_mut.fill_ratio += 1;
-                } else {
-                    dirty_mut.fill_ratio = 1;
-                    dirty_mut.p_type = ParticleType::Water;
-                }
+                self.grid.get_mut(slurp_x, src_y).fill_ratio -= delta;
+
+                self.grid.set(tgt_x, tgt_y, Particle {
+                    fill_ratio: delta,
+                    p_type: ParticleType::Water,
+                    ..Default::default()
+                });
 
                 self.has_changed_grid.set(tgt_x, tgt_y, true);
-                return;
+                break;
             }
         }
     }
@@ -238,8 +243,11 @@ impl Physics {
 
         // Yay bfs
         if max_fr > base_fr + 1 {
-            self.grid.get_mut(max_x, y).fill_ratio -= 1;
-            self.grid.get_mut(x, y).fill_ratio += 1;
+            let fill_rate = 4.0;
+            let delta = ((max_fr as f32 - base_fr as f32) / fill_rate).ceil() as u8;
+
+            self.grid.get_mut(max_x, y).fill_ratio -= delta;
+            self.grid.get_mut(x, y).fill_ratio += delta;
         }
     }
 
