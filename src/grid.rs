@@ -1,29 +1,11 @@
 use std::convert::{TryInto};
 
-pub const MAX_FILL: u8 = 64;
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum Bearing {
-    None,
-    Left,
-    Right,
-}
-
-impl Bearing {
-    pub fn flip(&self) -> Bearing {
-        match self {
-            Bearing::None  => Bearing::None,
-            Bearing::Left  => Bearing::Right,
-            Bearing::Right => Bearing::Left
-        }
-    }
-}
+pub const MAX_FILL: u8 = 16;
 
 #[derive(Clone, Debug)]
 pub struct Particle {
     pub p_type: ParticleType,
     pub fill_ratio: u8,
-    pub bearing: Bearing,
 }
 
 impl Default for Particle {
@@ -31,7 +13,6 @@ impl Default for Particle {
         Particle {
             p_type: ParticleType::Empty,
             fill_ratio: MAX_FILL,
-            bearing: Bearing::None,
         }
     }
 }
@@ -113,15 +94,6 @@ impl Grid<Particle> {
             false
         } else {
             self.get(x, y).p_type == ParticleType::Empty
-        }
-    }
-
-    pub fn fill_ratio_at(&self, x: i32, y: i32) -> u8 {
-        let tile = self.get(x, y);
-        if tile.p_type == ParticleType::Empty {
-            0
-        } else {
-            tile.fill_ratio
         }
     }
 }

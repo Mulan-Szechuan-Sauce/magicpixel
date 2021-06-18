@@ -86,9 +86,8 @@ impl <'a> DebugWindow<'a> {
         self.draw_text(format!("FPS: {}", fps_text), 10, 10, Color::WHITE);
         self.draw_text(format!("{:?}", particle.p_type), 10, 35, Color::WHITE);
         self.draw_text(format!("{: >3}/{}", particle.fill_ratio, MAX_FILL), 110, 35, Color::WHITE);
-        self.draw_text(format!("{:?}", particle.bearing), 10, 60, Color::WHITE);
-        self.draw_text(format!("{:?}", context.draw_type), 10, 85, Color::WHITE);
-        self.draw_text(format!("{:?}", sum_water), 10, 110, Color::WHITE);
+        self.draw_text(format!("{:?}", context.draw_type), 10, 60, Color::WHITE);
+        self.draw_text(format!("{:?}", sum_water), 10, 85, Color::WHITE);
 
         self.canvas.present();
     }
