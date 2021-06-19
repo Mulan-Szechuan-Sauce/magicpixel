@@ -86,7 +86,7 @@ impl Physics {
     }
 
     // Slurp into the target (BFS from the target)
-    fn slurp_into(&mut self, src_left: i32, src_right: i32, src_y: i32, tgt_x: i32, tgt_y: i32) {
+    fn spread_to(&mut self, src_left: i32, src_right: i32, src_y: i32, tgt_x: i32, tgt_y: i32) {
         if self.grid.get(tgt_x, tgt_y).p_type == ParticleType::Water {
             panic!("wtf man");
         }
@@ -166,11 +166,28 @@ impl Physics {
         unfilled
     }
 
-    fn flow_down(&mut self, x: i32, y: i32) {
+    fn flow_down(&mut self, x: i32, y: i32, lhs: i32, rhs: i32) {
         let target = self.grid.get(x, y + 1).clone();
 
         if target.p_type == ParticleType::Empty {
             self.grid.swap(x, y, x, y + 1);
+            self.inner_fill(lhs, rhs, x, y);
+            self.has_changed_grid.set(x, y, true);
+
+            // In case it's 1s all the way down
+            if self.grid.is_empty(x, y) {
+                match self.find_edge(lhs, rhs, y) {
+                    Some(edge_x) => {
+                        self.grid.swap(x, y, edge_x, y);
+                    },
+                    None => {}
+                }
+            }
+
+            return;
+        }
+
+        if self.grid.is_empty(x, y) {
             return;
         }
 
@@ -190,6 +207,31 @@ impl Physics {
         self.grid.get_mut(x, y + 1).fill_ratio = new_target_fr;
     }
 
+    // Find a random non-empty edge on the left or right side
+    fn find_edge(&mut self, lhs: i32, rhs: i32, y: i32) -> Option<i32> {
+        let mut bfs_left = lhs;
+        let mut bfs_right = rhs;
+
+        // NOTE: Maybe don't randomly dance between left and right sides
+        while bfs_left < bfs_right {
+            random_eval!(
+                self.rng,
+                if self.grid.is_empty(bfs_left, y) {
+                    bfs_left += 1;
+                } else {
+                    return Some(bfs_left);
+                },
+                if self.grid.is_empty(bfs_right, y) {
+                    bfs_right -= 1;
+                } else {
+                    return Some(bfs_right);
+                }
+            );
+        }
+
+        None
+    }
+
     fn inner_fill(&mut self, range_left: i32, range_right: i32, x: i32, y: i32) {
         let mut bfs_left = x - 1;
         let mut bfs_right = x + 1;
@@ -197,13 +239,17 @@ impl Physics {
         let mut max_fr = 0;
         let mut max_x  = -1;
 
-        let base_fr = self.grid.get(x, y).fill_ratio;
+        let base_fr = if self.grid.get(x, y).p_type == ParticleType::Empty {
+            0
+        } else {
+            self.grid.get(x, y).fill_ratio
+        };
 
         while bfs_left >= range_left || bfs_right <= range_right {
             random_eval!(
                 self.rng,
                 if bfs_left >= range_left {
-                    if self.grid.get(bfs_left, y).p_type == ParticleType::Empty {
+                    if self.grid.is_empty(bfs_left, y) {
                         bfs_left -= 1;
                     } else {
                         let fr = self.grid.get(bfs_left, y).fill_ratio;
@@ -221,7 +267,7 @@ impl Physics {
                     }
                 },
                 if bfs_right <= range_right {
-                    if self.grid.get(bfs_right, y).p_type == ParticleType::Empty {
+                    if self.grid.is_empty(bfs_right, y) {
                         bfs_right += 1;
                     } else {
                         let fr = self.grid.get(bfs_right, y).fill_ratio;
@@ -247,7 +293,15 @@ impl Physics {
             let delta = ((max_fr as f32 - base_fr as f32) / fill_rate).ceil() as u8;
 
             self.grid.get_mut(max_x, y).fill_ratio -= delta;
-            self.grid.get_mut(x, y).fill_ratio += delta;
+
+            if self.grid.is_empty(x, y) {
+                self.grid.get_mut(x, y).p_type = ParticleType::Water;
+                self.grid.get_mut(x, y).fill_ratio = delta;
+            } else {
+                self.grid.get_mut(x, y).fill_ratio += delta;
+            }
+
+            self.has_changed_grid.set(x, y, true);
         }
     }
 
@@ -258,17 +312,17 @@ impl Physics {
 
         if underlings.len() > 0 {
             for xi in underlings {
-                self.flow_down(xi, y);
+                self.flow_down(xi, y, x, right_x);
             }
-        } 
+        }
 
         // Horizontal flow
         random_condition!(
             self.rng,
             self.grid.is_empty(x - 1, y),
-            self.slurp_into(x, right_x, y, x - 1, y),
+            self.spread_to(x, right_x, y, x - 1, y),
             self.grid.is_empty(right_x + 1, y),
-            self.slurp_into(x, right_x, y, right_x + 1, y)
+            self.spread_to(x, right_x, y, right_x + 1, y)
         );
 
         for xi in x..=right_x {
