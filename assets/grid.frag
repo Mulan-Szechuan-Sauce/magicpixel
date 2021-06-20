@@ -18,6 +18,7 @@ uniform int mouse_x = 4;
 uniform int mouse_y = 4;
 
 bool should_draw_box(float x, float y, int grid_x, int grid_y) {
+    // FIXME: Breaks for some scales
     // Hey Marvin, it's a box
     return 
         (mouse_x == grid_x && mouse_y == grid_y) &&

@@ -63,12 +63,24 @@ impl Physics {
         let p_type = self.grid.get(x2, y2).p_type;
 
         if p_type == ParticleType::Water || p_type == ParticleType::Empty {
-            // TODO: try_flow_horizontal if water instead of swapping above
+            self.flow_adjacent(x2, y2);
             self.grid.swap(x1, y1, x2, y2);
             true
         } else {
             false
         }
+    }
+
+    fn flow_adjacent(&mut self, x: i32, y: i32) {
+        random_eval!(
+            self.rng,
+            if self.grid.in_bounds(x - 1, y) {
+                self.try_flow_into(x, y, x - 1, y);
+            },
+            if self.grid.in_bounds(x + 1, y) {
+                self.try_flow_into(x, y, x + 1, y);
+            }
+        );
     }
 
     fn try_move_sand(&mut self, x: i32, y: i32) {
@@ -185,26 +197,43 @@ impl Physics {
             }
 
             return;
-        }
-
-        if self.grid.is_empty(x, y) {
+        } else if target.p_type != ParticleType::Water || self.grid.is_empty(x, y) {
             return;
         }
 
-        let source = self.grid.get(x, y);
+        self.flow_into(x, y, x, y + 1);
+    }
 
-        let net_fr = source.fill_ratio + target.fill_ratio;
+    fn try_flow_into(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
+        let target = self.grid.get(x2, y2).clone();
+        let source = self.grid.get(x1, y1).clone();
+
+        if target.p_type == ParticleType::Empty {
+            self.grid.swap(x1, y1, x2, y2);
+            true
+        } else if target.p_type != source.p_type {
+            false
+        } else {
+            self.flow_into(x1, y1, x2, y2);
+            true
+        }
+    }
+
+    fn flow_into(&mut self, x1: i32, y1: i32, x2: i32, y2: i32) {
+        let target_fr = self.grid.get(x2, y2).fill_ratio;
+        let source_fr = self.grid.get(x1, y1).fill_ratio;
+
+        let net_fr = source_fr + target_fr;
         let new_target_fr = min(MAX_FILL, net_fr);
         let new_source_fr = net_fr - new_target_fr;
 
         if new_source_fr == 0 {
-            self.grid.clear(x, y);
-            self.grid.get_mut(x, y + 1).fill_ratio = new_target_fr;
-            return;
+            self.grid.clear(x1, y1);
+            self.grid.get_mut(x2, y2).fill_ratio = new_target_fr;
+        } else {
+            self.grid.get_mut(x1, y1).fill_ratio = new_source_fr;
+            self.grid.get_mut(x2, y2).fill_ratio = new_target_fr;
         }
-
-        self.grid.get_mut(x, y).fill_ratio = new_source_fr;
-        self.grid.get_mut(x, y + 1).fill_ratio = new_target_fr;
     }
 
     // Find a random non-empty edge on the left or right side
