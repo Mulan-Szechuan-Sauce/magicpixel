@@ -2,7 +2,7 @@ use std::cmp::{min};
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
-use crate::grid::{Grid, Particle, ParticleGrid, ParticleType, MAX_FILL};
+use crate::grid::{Grid, Particle, ParticleGrid, ParticleType};
 
 macro_rules! random_eval {
     ($rng:expr, $x:expr, $y:expr) => {
@@ -38,16 +38,18 @@ pub struct Physics {
     rng: ThreadRng,
     grid: Box<ParticleGrid>,
     has_changed_grid: Grid<bool>,
+    max_fill: u8,
 }
 
 impl Physics {
-    pub fn new(grid: ParticleGrid) -> Physics {
+    pub fn new(grid: ParticleGrid, max_fill: u8) -> Physics {
         let bool_grid = Grid::new(grid.width, grid.height);
 
         Physics {
             rng: rand::thread_rng(),
             grid: Box::new(grid),
             has_changed_grid: bool_grid,
+            max_fill: max_fill,
         }
     }
 
@@ -170,7 +172,7 @@ impl Physics {
             let particle = self.grid.get(x, y);
 
             if particle.p_type == ParticleType::Empty ||
-                particle.p_type == ParticleType::Water && particle.fill_ratio < MAX_FILL {
+                particle.p_type == ParticleType::Water && particle.fill_ratio < self.max_fill {
                 unfilled.push(x);
             }
         }
@@ -224,7 +226,7 @@ impl Physics {
         let source_fr = self.grid.get(x1, y1).fill_ratio;
 
         let net_fr = source_fr + target_fr;
-        let new_target_fr = min(MAX_FILL, net_fr);
+        let new_target_fr = min(self.max_fill, net_fr);
         let new_source_fr = net_fr - new_target_fr;
 
         if new_source_fr == 0 {

@@ -1,3 +1,4 @@
+extern crate clap;
 extern crate sdl2;
 extern crate gl;
 
@@ -14,12 +15,37 @@ use grid::*;
 use render::*;
 use debug::DebugWindow;
 
+use clap::{AppSettings, Clap};
+use serde::{Serialize, Deserialize};
+
 use sdl2::event::Event;
 use sdl2::event::WindowEvent;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::{ MouseButton };
 
+use std::io::prelude::*;
+use std::fs::File;
+use std::io::Write;
 use std::time::{SystemTime};
+
+#[derive(Clap)]
+#[clap(setting = AppSettings::ColoredHelp)]
+pub struct Opts {
+    #[clap(short = 'f', long, default_value = "8")]
+    max_fill: u8,
+    #[clap(short = 's', long)]
+    file_path: Option<String>,
+    #[clap(short = 'h', long)]
+    height: Option<i32>,
+    #[clap(short = 'w', long)]
+    width: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SaveState {
+    max_fill: u8,
+    grid: ParticleGrid,
+}
 
 pub struct RenderContext {
     pub scale: f32,
@@ -30,6 +56,7 @@ pub struct RenderContext {
     pub mouse_x: i32,
     pub mouse_y: i32,
     pub draw_type: ParticleType,
+    pub max_fill: u8,
 }
 
 impl RenderContext {
@@ -51,22 +78,6 @@ fn find_sdl_gl_driver() -> Option<u32> {
     None
 }
 
-fn create_simple_grid() -> ParticleGrid {
-    let grid = ParticleGrid::new(26, 26);
-
-    // for x in 0..25 {
-    //     for y in 24..25 {
-    //         grid.set(x, y, Particle {
-    //             p_type: ParticleType::Water,
-    //             fill_ratio: MAX_FILL,
-    //             ..Default::default()
-    //         });
-    //     }
-    // }
-
-    grid
-}
-
 fn insert_particle(
     grid: &mut ParticleGrid,
     context: &RenderContext,
@@ -75,7 +86,7 @@ fn insert_particle(
     edit_particle(grid, context, |_| {
         Particle {
             p_type: p_type.clone(),
-            ..Default::default()
+            fill_ratio: context.max_fill,
         }
     });
 }
@@ -91,9 +102,45 @@ fn edit_particle<F>(grid: &mut ParticleGrid, context: &RenderContext, edit_func:
     }
 }
 
-pub fn main() {
-    let grid = create_simple_grid();
+fn load_state(path: String) -> SaveState {
+    let mut f = File::open(path).expect("File not found");
 
+    // Ignore version for now
+    let mut version: [u8; 1] = [0; 1];
+    let _ = f.read(&mut version).expect("File is empty");
+
+    let mut buff_bois: Vec<u8> = Vec::new();
+    let _ = f.read_to_end(&mut buff_bois).unwrap();
+
+    bincode::deserialize(&buff_bois).expect("Corrupted file")
+}
+
+fn save_state(path: String, state: SaveState) {
+    let encoded: Vec<u8> = bincode::serialize(&state).unwrap();
+
+    let mut buffer = File::create(path).expect("Could not save to path");
+    // Version byte
+    let _ = buffer.write(&[1u8]);
+    let _ = buffer.write_all(encoded.as_ref());
+}
+
+pub fn main() -> Result<(), String> {
+    let opts: Opts = Opts::parse();
+
+    let (grid, max_fill) = match (opts.file_path, opts.width, opts.height) {
+        (Some(fp), _, _) => {
+            let state = load_state(fp);
+            (state.grid, state.max_fill)
+        },
+        (_, Some(width), Some(height)) => {
+            (ParticleGrid::new(width, height), opts.max_fill)
+        },
+        _ => {
+            return Err("Must specify a file path, or a height&width".to_string());
+        }
+    };
+
+    // FIXME: This is waste
     let max_win_width = 2400.0;
     let max_win_height = 1400.0;
 
@@ -114,9 +161,10 @@ pub fn main() {
         mouse_x: 0,
         mouse_y: 0,
         draw_type: ParticleType::Water,
+        max_fill: max_fill,
     };
 
-    let mut physics = Physics::new(grid);
+    let mut physics = Physics::new(grid, max_fill);
 
     let ttf_context = sdl2::ttf::init().map_err(|e| e.to_string()).unwrap();
     let sdl_context = sdl2::init().unwrap();
@@ -178,6 +226,12 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::P), .. } => {
                     is_paused = !is_paused;
                 },
+                Event::KeyDown { keycode: Some(Keycode::S), .. } => {
+                    save_state("save.mp".to_string(), SaveState {
+                        grid: physics.get_grid().as_ref().clone(),
+                        max_fill: max_fill,
+                    });
+                },
                 Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
                     physics.update();
                 },
@@ -213,7 +267,7 @@ pub fn main() {
                             let new_fill_ratio = p.fill_ratio as i32 + y;
 
                             Particle {
-                                fill_ratio: max(1, min(MAX_FILL, new_fill_ratio as u8)),
+                                fill_ratio: max(1, min(max_fill, new_fill_ratio as u8)),
                                 ..p.clone()
                             }
                         }
@@ -268,4 +322,6 @@ pub fn main() {
         canvas.present();
         debug_window.render(&physics.get_grid(), &context, curr_time);
     }
+
+    Ok(())
 }

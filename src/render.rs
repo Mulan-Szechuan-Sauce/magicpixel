@@ -1,6 +1,6 @@
 extern crate gl;
 
-use crate::grid::{ParticleGrid, ParticleType, MAX_FILL};
+use crate::grid::{ParticleGrid, ParticleType};
 use crate::{RenderContext};
 
 use std::ffi::CString;
@@ -132,7 +132,7 @@ impl Renderer for GlslRenderer {
         self.set_uniform_i32("grid_width", context.grid_width);
         self.set_uniform_i32("win_height", context.win_height as i32);
         self.set_uniform_f32("scale", context.scale);
-        self.set_uniform_i32("max_fill", MAX_FILL as i32);
+        self.set_uniform_i32("max_fill", context.max_fill as i32);
 
         self.set_uniform_i32("mouse_x", (context.mouse_x as f32 / context.scale) as i32);
         self.set_uniform_i32("mouse_y", (context.mouse_y as f32 / context.scale) as i32);

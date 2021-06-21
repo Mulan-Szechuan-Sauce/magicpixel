@@ -1,8 +1,7 @@
+use serde::{Serialize, Deserialize};
 use std::convert::{TryInto};
 
-pub const MAX_FILL: u8 = 8;
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Particle {
     pub p_type: ParticleType,
     pub fill_ratio: u8,
@@ -12,12 +11,12 @@ impl Default for Particle {
     fn default() -> Particle {
         Particle {
             p_type: ParticleType::Empty,
-            fill_ratio: MAX_FILL,
+            fill_ratio: 0,
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Grid<T> where T: Clone {
     pub width: i32,
     pub height: i32,
@@ -78,7 +77,7 @@ impl<T> Grid<T> where T: Clone + Default {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum ParticleType {
     Wood,
     Sand,
