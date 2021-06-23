@@ -3,6 +3,9 @@ extern crate gl;
 use crate::grid::{ParticleGrid, ParticleType};
 use crate::{RenderContext};
 
+use sdl2::render::Canvas;
+use sdl2::video::Window;
+
 use std::ffi::CString;
 
 use gl::types::{GLfloat, GLenum, GLuint, GLint, GLchar, GLsizeiptr};
@@ -16,14 +19,28 @@ pub struct GlslRenderer {
     grid_buffer_id: GLuint,
     program_id: GLuint,
     pixel_data: Vec<u32>,
+    canvas: Canvas<Window>,
 }
 
 impl GlslRenderer {
     pub fn new(
         vert_shader_path: String,
         frag_shader_path: String,
-        context: &RenderContext
+        context: &RenderContext,
+        window: Window,
+        video_subsystem: &sdl2::VideoSubsystem,
     ) -> GlslRenderer {
+        // initialization
+        gl::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const _);
+
+        let canvas = window.into_canvas()
+            .index(find_sdl_gl_driver().expect("Could not find GL driver"))
+            .build()
+            .unwrap();
+
+        // sdl::render creates a context for you, if you use a Canvas you need to use it.
+        let _ = canvas.window().gl_set_context_to_current();
+
         let vert_shader_src = std::fs::read_to_string(vert_shader_path).expect("shader not found!");
         let vert_shader_id = compile_shader(&vert_shader_src, gl::VERTEX_SHADER);
 
@@ -43,6 +60,7 @@ impl GlslRenderer {
             grid_buffer_id: GlslRenderer::allocate_grid_buffer(mem_size),
             program_id: program_id,
             pixel_data: pixel_data,
+            canvas: canvas,
         }
     }
 
@@ -129,6 +147,8 @@ impl GlslRenderer {
 
 impl Renderer for GlslRenderer {
     fn render(&mut self, grid: &ParticleGrid, context: &RenderContext) {
+        self.canvas.clear();
+
         self.set_uniform_i32("grid_width", context.grid_width);
         self.set_uniform_i32("win_height", context.win_height as i32);
         self.set_uniform_f32("scale", context.scale);
@@ -174,6 +194,8 @@ impl Renderer for GlslRenderer {
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
             gl::DisableVertexAttribArray(0);
         }
+
+        self.canvas.present();
     }
 }
 
@@ -256,4 +278,13 @@ fn compile_shader(src: &str, ty: GLenum) -> GLuint {
         }
     }
     shader
+}
+
+fn find_sdl_gl_driver() -> Option<u32> {
+    for (index, item) in sdl2::render::drivers().enumerate() {
+        if item.name == "opengl" {
+            return Some(index as u32);
+        }
+    }
+    None
 }
