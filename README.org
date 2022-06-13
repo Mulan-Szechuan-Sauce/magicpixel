@@ -2,4 +2,4 @@
 
 A sand and water simulator where every voxel is individually simulated.
 
-Written in rust using [sdl2](https://docs.rs/sdl2/latest/sdl2/) for window creation + user inputs and [gl](https://docs.rs/gl/latest/gl/) for OpenGL bindings.
+Written in rust using [[https://docs.rs/sdl2/latest/sdl2/][sdl2]] for window creation + user inputs and [[https://docs.rs/gl/latest/gl/][gl]] for OpenGL bindings.
